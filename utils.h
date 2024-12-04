@@ -12,7 +12,7 @@
 #define MAX_USERS 10            // Máximo de utilizadores
 #define MAX_TOPICS 20           // Máximo de tópicos
 #define MAX_TOPICS_MSG_PERSIS 5 // Máximo de mensagens persistentes por tópico
-#define TAM_NOME 20             // Máximo de caracteres no nome do utilizador
+#define TAM_NOME 100            // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
 
 // Nome do FIFO do manager
@@ -32,15 +32,31 @@
 #define TOPICO_MAXIMO "Maximo de topicos atingido\n"
 #define TOPICO_MAX_MSG_PERSISTENTES "Maximo de mensagens persistentes referentes a este topico atingido\n"
 
+// ---- COMANDOS ----
+#define TOPICS "TOPICS"
+#define SUBSCRIBE "SUBSCRIBE"
+#define UNSUBSCRIBE "UNSUBSCRIBE"
+#define MSG "MSG"
+#define EXIT "EXIT"
+
 // ---- ESTRUTURAS DE DADOS ----
+
+// Estrutura para mensagens
+typedef struct
+{
+    char topico[TAM_NOME]; // Tópico da mensagem
+    int duracao;           // Duração da mensagem
+    char *mensagem;        // Corpo da mensagem
+} mensagem_t;
 
 // Estrutura para pedidos (mensagem enviada por um utilizador)
 typedef struct
 {
     pid_t PidRemetente;       // PID do remetente
     char nome_user[TAM_NOME]; // Nome do jogador
-    char comando[TAM_MSG];    // Comando enviado
-} pedido_t;
+    char comando[TAM_NOME];   // Comando enviado
+    mensagem_t mensagem;      // Mensagem enviada
+} pedido;
 
 // Estrutura para representar um utilizador
 typedef struct

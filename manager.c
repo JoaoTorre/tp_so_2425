@@ -1,35 +1,67 @@
 #include "manager.h"
 
-int manager_fifo_fd;    // Variável global
-pthread_mutex_t trinco; // Variável global
-
+int manager_fifo_fd;
+pthread_mutex_t trinco;
+pthread_mutex_t clientes_mutex; // Mutex para proteger a lista de clientes registrados
+CLIENT *clientes_registrados = NULL;
+// Função para finalizar o sistema
 void sair()
 {
-    // Fechar e remover o FIFO
     close(manager_fifo_fd);
     unlink(MANAGER_FIFO);
-
-    // Destruir o mutex
     pthread_mutex_destroy(&trinco);
-
-    // Mensagem de encerramento
     printf("\n[MANAGER] - Motor desligado. Até breve!\n");
-
-    // Use apenas return para encerrar o programa
-    return;
+    exit(0);
 }
 
+// Função para tratar sinais de encerramento
 void handle_signal(int sig, siginfo_t *info, void *ucontext)
 {
-    printf("\n[SINAL] - Recebido sinal %d. Encerrando...\n", sig);
-
+    printf("\n[SINAL] - Sinal Recebido %d. A encerrar...\n", sig);
     sair();
 }
 
+// Função para verificar se o cliente já foi registrado
+int cliente_ja_registrado(pid_t pid)
+{
+    pthread_mutex_lock(&clientes_mutex);
+    CLIENT *atual = clientes_registrados;
+    while (atual)
+    {
+        if (atual->PidRemetente == pid)
+        {
+            pthread_mutex_unlock(&clientes_mutex);
+            return 1; // Cliente já registrado
+        }
+        atual = atual->nextClient;
+    }
+    pthread_mutex_unlock(&clientes_mutex);
+    return 0; // Cliente não registrado
+}
+
+// Função para adicionar cliente à lista de registrados
+void adicionar_cliente_registrado(pid_t pid)
+{
+    CLIENT *novo_cliente = malloc(sizeof(CLIENT));
+    if (!novo_cliente)
+    {
+        fprintf(stderr, "[ERRO] - Falha ao alocar memória para o cliente registrado.\n");
+        return;
+    }
+
+    novo_cliente->PidRemetente = pid;
+    novo_cliente->nextClient = NULL;
+
+    pthread_mutex_lock(&clientes_mutex);
+    novo_cliente->nextClient = clientes_registrados;
+    clientes_registrados = novo_cliente;
+    pthread_mutex_unlock(&clientes_mutex);
+}
+
+// Função para criar FIFO
 void Abrir_ManagerPipe(int *manager_fifo_fd)
 {
-    // Criar FIFO para o Manager
-    if (mkfifo(MANAGER_FIFO, 0777) == -1)
+    if (mkfifo(MANAGER_FIFO, 0666) == -1)
     {
         perror("[ERRO] - FIFO já existe ou não foi possível criá-lo");
         exit(EXIT_FAILURE);
@@ -37,10 +69,9 @@ void Abrir_ManagerPipe(int *manager_fifo_fd)
 
     printf("\n[MANAGER] - FIFO criado com sucesso.\n");
 
-    // Abrir FIFO em modo bloqueante
-    if ((*manager_fifo_fd = open(MANAGER_FIFO, O_RDWR)) == -1)
+    *manager_fifo_fd = open(MANAGER_FIFO, O_RDWR);
+    if (*manager_fifo_fd == -1)
     {
-        perror("[ERRO] - Falha ao abrir FIFO para leitura/escrita");
         unlink(MANAGER_FIFO); // Limpar recursos
         exit(EXIT_FAILURE);
     }
@@ -48,43 +79,109 @@ void Abrir_ManagerPipe(int *manager_fifo_fd)
     printf("\n[MANAGER] - FIFO aberto para leitura e escrita.\n");
 }
 
+// Função para abrir o pipe do cliente
 int abre_ClientPipe(pid_t pidCliente)
 {
-    int clientpipe_fd;
     char pipe[100];
-
     sprintf(pipe, FEED_FIFO, pidCliente);
 
-    // Abrir FIFO do cliente
-    if ((clientpipe_fd = open(pipe, O_WRONLY)) == -1)
-    {
-        fprintf(stderr, "\n[ERRO] - Falha ao abrir FIFO do cliente (PID: %d).\n", pidCliente);
-        return -1;
-    }
+    printf("[INFO] - Abrindo FIFO do cliente (PATH: %s)...\n", pipe);
 
-    return clientpipe_fd;
+    int fifo_fd = open(pipe, O_RDWR);
+    if (fifo_fd == -1)
+    {
+        perror("[ERRO] - Falha ao abrir FIFO");
+    }
+    return fifo_fd;
 }
 
+void *responder_feed(void *arg)
+{
+    int feed_fifo_fd;
+    CLIENT *client = (CLIENT *)arg;
+    resposta_t resposta;
+    pedido pedido;
+    int nBytes_lidos, nBytes_escritos;
+    fd_set read_fds;
+    struct timeval timeout;
+
+    // Abrir FIFO do cliente
+    feed_fifo_fd = abre_ClientPipe(client->PidRemetente);
+    if (feed_fifo_fd == -1)
+    {
+        fprintf(stderr, "[ERRO] - Falha ao abrir FIFO do cliente (PID: %d).\n", client->PidRemetente);
+        free(client);
+        return NULL;
+    }
+
+    while (1)
+    {
+        // Inicializar o conjunto de descritores de leitura
+        FD_ZERO(&read_fds);
+        FD_SET(feed_fifo_fd, &read_fds);
+
+        printf("[THREAD %d] - Aguardando dados no FIFO...\n", client->PidRemetente);
+
+        int retval = select(feed_fifo_fd + 1, &read_fds, NULL, NULL, NULL);
+        if (retval == -1)
+        {
+            perror("[ERRO] - Falha no select");
+            exit(EXIT_FAILURE);
+        }
+
+        if (FD_ISSET(feed_fifo_fd, &read_fds))
+        {
+            nBytes_lidos = read(feed_fifo_fd, &pedido, sizeof(pedido));
+            if (nBytes_lidos == -1)
+            {
+                perror("[ERRO] - Falha ao ler do FIFO");
+            }
+            else
+            {
+                printf("[INFO] - Pedido lido: %s\n", pedido.comando);
+                printf("[INFO] - Nbytes lidos: %d\n", nBytes_lidos);
+                strcpy(resposta.resposta, FEED_ACEITE);
+                printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+                if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                {
+                    perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                }
+            }
+        }
+    }
+
+    close(feed_fifo_fd);
+    free(client);
+    return NULL;
+}
+
+// Função para processar pedido do Manager
 void processa_pedido(int manager_fifo_fd, pthread_mutex_t *trinco)
 {
     CLIENT *newClient;
-    pedido_t pedido;
+    pedido pedido;
     resposta_t resposta;
     int feed_fifo_fd, nBytes_lidos, nBytes_escritos;
 
     // Ler pedido do Manager FIFO
-    if ((nBytes_lidos = read(manager_fifo_fd, &pedido, sizeof(pedido))) == -1)
+    nBytes_lidos = read(manager_fifo_fd, &pedido, sizeof(pedido));
+    if (nBytes_lidos == -1)
     {
         perror("[ERRO] - Falha ao ler do FIFO do Manager");
         return;
     }
 
-    // Verificar comando do pedido
     if (strstr(pedido.comando, PEDIDO_PARA_JOGAR))
     {
-        printf("\n[JOGADOR %d] Nome: %s\n", pedido.PidRemetente, pedido.nome_user);
+        // Verificar se o cliente já foi registrado
+        if (cliente_ja_registrado(pedido.PidRemetente))
+        {
+            printf("[MANAGER] Cliente já registrado: %d. Ignorando pedido.\n", pedido.PidRemetente);
+            return; // Cliente já registrado, não processa mais no loop principal
+        }
 
-        // Alocar novo cliente
+        // Alocar e registrar o cliente
         newClient = malloc(sizeof(CLIENT));
         if (!newClient)
         {
@@ -103,37 +200,55 @@ void processa_pedido(int manager_fifo_fd, pthread_mutex_t *trinco)
 
         printf("[MANAGER] Novo cliente registrado: %s\n", newClient->user.nome);
 
+        // Adicionar cliente à lista de registrados
+        adicionar_cliente_registrado(pedido.PidRemetente);
+
         // Abrir FIFO do cliente
-        if ((feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente)) == -1)
+        feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+        if (feed_fifo_fd == -1)
         {
             free(newClient);
             return;
         }
 
-        // Responder ao cliente
+        // Enviar resposta para o cliente
         strcpy(resposta.resposta, FEED_ACEITE);
         printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
 
-        if ((nBytes_escritos = write(feed_fifo_fd, &resposta, sizeof(resposta))) == -1)
+        if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
         {
             perror("[ERRO] - Falha ao enviar resposta para o cliente");
         }
 
-        close(feed_fifo_fd);
-        free(newClient);
+        // Criar a thread para responder ao feed do cliente
+        pthread_t thread_feed;
+        if (pthread_create(&thread_feed, NULL, responder_feed, (void *)newClient) != 0)
+        {
+            fprintf(stderr, "[ERRO] - Falha ao criar thread para responder ao feed do cliente\n");
+            free(newClient);
+        }
+        else
+        {
+            pthread_detach(thread_feed); // Garantir que a thread será liberada automaticamente após terminar
+        }
+    }
+    else
+    {
+        printf("\n[ERRO] - Comando inválido: %s\n", pedido.comando);
     }
 }
 
+// Função principal
 int main(int argc, char *argv[])
 {
     int continua = 1;
     fd_set fdset, fdset_backup;
     struct sigaction sa;
 
-    // Inicializar mutex
     pthread_mutex_init(&trinco, NULL);
+    pthread_mutex_init(&clientes_mutex, NULL);
 
-    // Configurar tratamento de sinais
+    // Configurar o tratamento de sinais
     sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = handle_signal;
     sigaction(SIGINT, &sa, NULL);
@@ -141,7 +256,6 @@ int main(int argc, char *argv[])
     // Criar e abrir FIFO do Manager
     Abrir_ManagerPipe(&manager_fifo_fd);
 
-    // Inicializar conjuntos de descritores de arquivo
     FD_ZERO(&fdset);
     FD_SET(STDIN_FILENO, &fdset);
     FD_SET(manager_fifo_fd, &fdset);
@@ -160,13 +274,14 @@ int main(int argc, char *argv[])
             break;
         }
 
-        if (FD_ISSET(STDIN_FILENO, &fdset_backup)) // stdin
+        if (FD_ISSET(STDIN_FILENO, &fdset_backup))
         {
             char entrada[100];
             if (fgets(entrada, sizeof(entrada), stdin))
             {
+                toUpperString(entrada);
                 entrada[strcspn(entrada, "\n")] = 0;
-                if (strcmp(entrada, "exit") == 0)
+                if (strcmp(entrada, "EXIT") == 0)
                 {
                     printf("\n[MANAGER] Comando recebido: desligar.\n");
                     sair();
@@ -179,12 +294,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (FD_ISSET(manager_fifo_fd, &fdset_backup)) // FIFO do Manager
+        if (FD_ISSET(manager_fifo_fd, &fdset_backup))
         {
             processa_pedido(manager_fifo_fd, &trinco);
         }
     }
 
-    sair(); // Garantir que o sistema seja desligado corretamente
+    sair();
     return 0;
 }
