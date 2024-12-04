@@ -44,9 +44,9 @@
 // Estrutura para mensagens
 typedef struct
 {
-    char topico[TAM_NOME]; // Tópico da mensagem
-    int duracao;           // Duração da mensagem
-    char *mensagem;        // Corpo da mensagem
+    char topico[TAM_NOME];  // Tópico da mensagem
+    int duracao;            // Duração da mensagem
+    char mensagem[TAM_MSG]; // Corpo da mensagem
 } mensagem_t;
 
 // Estrutura para pedidos (mensagem enviada por um utilizador)
@@ -56,7 +56,7 @@ typedef struct
     char nome_user[TAM_NOME]; // Nome do jogador
     char comando[TAM_NOME];   // Comando enviado
     mensagem_t mensagem;      // Mensagem enviada
-} pedido;
+} pedido_t;
 
 // Estrutura para representar um utilizador
 typedef struct

@@ -4,6 +4,7 @@ int manager_fifo_fd;
 pthread_mutex_t trinco;
 pthread_mutex_t clientes_mutex; // Mutex para proteger a lista de clientes registrados
 CLIENT *clientes_registrados = NULL;
+
 // Função para finalizar o sistema
 void sair()
 {
@@ -100,7 +101,7 @@ void *responder_feed(void *arg)
     int feed_fifo_fd;
     CLIENT *client = (CLIENT *)arg;
     resposta_t resposta;
-    pedido pedido;
+    pedido_t pedido;
     int nBytes_lidos, nBytes_escritos;
     fd_set read_fds;
     struct timeval timeout;
@@ -149,6 +150,8 @@ void *responder_feed(void *arg)
                 }
             }
         }
+        close(feed_fifo_fd);
+        feed_fifo_fd = abre_ClientPipe(client->PidRemetente);
     }
 
     close(feed_fifo_fd);
@@ -160,7 +163,7 @@ void *responder_feed(void *arg)
 void processa_pedido(int manager_fifo_fd, pthread_mutex_t *trinco)
 {
     CLIENT *newClient;
-    pedido pedido;
+    pedido_t pedido;
     resposta_t resposta;
     int feed_fifo_fd, nBytes_lidos, nBytes_escritos;
 

@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     int Managerpipe_fd = -1;
     int FeedPipe_fd = -1;
     struct sigaction sa;
-    pedido pedidoRegisto, pedido;
+    pedido_t pedidoRegisto, pedido;
     resposta_t resposta;
     fd_set fdset;
     mensagem_t mensagem;
@@ -119,11 +119,8 @@ int main(int argc, char *argv[])
         printf("\n[RESPOSTA]: %s\n", resposta.resposta);
     }
 
-    memset(&mensagem, 0, sizeof(mensagem_t));
-
     while (1)
     {
-
         FD_ZERO(&fdset); // Reinicializar o fdset
         FD_SET(STDIN_FILENO, &fdset);
         FD_SET(FeedPipe_fd, &fdset);
@@ -131,7 +128,7 @@ int main(int argc, char *argv[])
         maxFd = (STDIN_FILENO > FeedPipe_fd) ? STDIN_FILENO : FeedPipe_fd;
         printf("[FEED] - Introduz um comando: ");
         fflush(stdout);
-        fflush(stdin);
+
         if ((n = select(maxFd + 1, &fdset, NULL, NULL, NULL)) == -1)
         {
             perror("[ERRO] - Erro no select");
@@ -175,6 +172,9 @@ int main(int argc, char *argv[])
                 }
             }
 
+            memset(&pedido, 0, sizeof(pedido));
+            memset(&mensagem, 0, sizeof(mensagem_t));
+
             if (strcmp(comando, "EXIT") == 0)
             {
                 printf("COMANDO SAIR\n");
@@ -185,7 +185,8 @@ int main(int argc, char *argv[])
                     perror("[ERRO] ao escrever no pipe Feed");
                     sair(Managerpipe_fd, FeedPipe_fd);
                 }
-                sair(Managerpipe_fd, FeedPipe_fd);
+                printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
+                printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 break; // Garantir que o loop seja encerrado após o envio do comando
             }
             else if (strcmp(comando, "MSG") == 0)
@@ -196,6 +197,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
+
                     strcpy(pedido.mensagem.topico, argumento1);
                     pedido.mensagem.duracao = atoi(argumento2);
                     strcpy(pedido.mensagem.mensagem, argumento3);
@@ -204,7 +206,6 @@ int main(int argc, char *argv[])
 
                     // Enviar a mensagem para o Manager pelo FIFO do cliente
                     printf("Dados do pedido:\n");
-                    printf("Topico: %s\n", pedido.mensagem.topico);
                     printf("Duracao: %d\n", pedido.mensagem.duracao);
                     printf("Mensagem: %s\n", pedido.mensagem.mensagem);
                     printf("PidRemetente: %d\n", pedido.PidRemetente);
@@ -216,6 +217,8 @@ int main(int argc, char *argv[])
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(Managerpipe_fd, FeedPipe_fd);
                     }
+                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
+                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
             }
             else if (strcmp(comando, "SUBSCRIBE") == 0)
@@ -233,6 +236,8 @@ int main(int argc, char *argv[])
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(Managerpipe_fd, FeedPipe_fd);
                     }
+                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
+                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
                 else
                 {
@@ -267,7 +272,10 @@ int main(int argc, char *argv[])
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(Managerpipe_fd, FeedPipe_fd);
                     }
+                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
+                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
+
                 else
                 {
                     printf("\n[ERRO] - Falta o nome do tópico após 'unsubscribe'\n");
@@ -275,7 +283,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                printf("\n[ERRO] - Comando '%s' não reconhecido\n", comando);
+                printf("\n[ERRO] - Comando '%s' não reconhecido\n", entrada);
             }
         }
 
@@ -293,7 +301,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-
     sair(Managerpipe_fd, FeedPipe_fd);
     return 0;
 }
