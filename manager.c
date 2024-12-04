@@ -5,6 +5,10 @@ pthread_mutex_t trinco;
 pthread_mutex_t clientes_mutex; // Mutex para proteger a lista de clientes registrados
 CLIENT *clientes_registrados = NULL;
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 // Função para finalizar o sistema
 void sair()
 {
@@ -13,6 +17,123 @@ void sair()
     pthread_mutex_destroy(&trinco);
     printf("\n[MANAGER] - Motor desligado. Até breve!\n");
     exit(0);
+}
+
+
+// Função para verificar comandos
+int VerificaComando(char* str){ 
+    toUpperString(str);
+
+     // Verifica se é o comando CLOSE    
+    if (strcmp(str, "CLOSE") == 0) {
+        printf("\n[MANAGER] Comando recebido: desligar.\n");
+        sair();
+        return 0;
+     // Verifica se é o comando USERS    
+    }else if(strcmp(str, "USERS") == 0){
+        printf("A mostrar listagem de utilizadores...\n");
+
+    // Verifica se é o comando TOPICS     
+    }else if(strcmp(str, "TOPICS") == 0){
+        printf("A mostrar a listagem de topicos...\n");
+
+    // Verifica se é o comando REMOVE
+    }else if (strncmp(str, "REMOVE ", 7) == 0 || strcmp(str, "REMOVE") == 0) {
+        int i = 7;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char remove_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o utilizador
+        while (i < len && str[i] != ' ' && contador < sizeof(remove_str) - 1) {
+            remove_str[contador++] = str[i++];
+        }
+        remove_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1) {
+            printf("A remover utilizador %s ...\n", remove_str);
+        } else {
+            printf("Insira no formato: remove <username>\n");
+        }
+
+    // Verifica se é o comando SHOW    
+    }else if ((strncmp(str, "SHOW ", 5) == 0) || strcmp(str, "SHOW") == 0){
+        int i = 5;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char topico_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o topico
+        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1) {
+            topico_str[contador++] = str[i++];
+        }
+        topico_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1) {
+            printf("A mostrar topico %s ...\n", topico_str);
+        } else {
+            printf("Insira no formato: show <topico>\n");
+        }
+
+      // Verifica se é o comando LOCK       
+      }else if ((strncmp(str, "LOCK ", 5) == 0) || strcmp(str, "LOCK") == 0){
+            int i = 5;
+            int encontrado = 0;
+            int contador = 0;
+            int len = strlen(str);
+            char topico_str[50] = {0}; // Inicializa com zeros
+
+            // Captura o topico
+            while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1) {
+                topico_str[contador++] = str[i++];
+            }
+            topico_str[contador] = '\0';
+
+            if (contador > 0)
+                encontrado += 1;
+
+            if (encontrado == 1) {
+                printf("A bloquear topico %s ...\n", topico_str);
+            } else {
+                printf("Insira no formato: lock <topico>\n");
+            }
+
+      // Verifica se é o comando UNLOCK     
+      }else if ((strncmp(str, "UNLOCK ", 7) == 0) || strcmp(str, "UNLOCK") == 0){
+            int i = 7;
+            int encontrado = 0;
+            int contador = 0;
+            int len = strlen(str);
+            char topico_str[50] = {0}; // Inicializa com zeros
+
+            // Captura o topico
+            while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1) {
+                topico_str[contador++] = str[i++];
+            }
+            topico_str[contador] = '\0';
+
+            if (contador > 0)
+                encontrado += 1;
+
+            if (encontrado == 1) {
+                printf("A desbloquear topico %s ...\n", topico_str);
+            } else {
+                printf("Insira no formato: unlock <topico>\n");
+            }
+       } 
+
+    // Comando não reconhecido
+    else {
+        printf("Comando não reconhecido: %s\n", str);
+    }    
 }
 
 // Função para tratar sinais de encerramento
@@ -277,23 +398,19 @@ int main(int argc, char *argv[])
             break;
         }
 
+         /* LINHA DE COMANDOS - ADMIN */   
+
         if (FD_ISSET(STDIN_FILENO, &fdset_backup))
         {
             char entrada[100];
             if (fgets(entrada, sizeof(entrada), stdin))
             {
-                toUpperString(entrada);
-                entrada[strcspn(entrada, "\n")] = 0;
-                if (strcmp(entrada, "EXIT") == 0)
-                {
-                    printf("\n[MANAGER] Comando recebido: desligar.\n");
-                    sair();
-                    continua = 0;
+                size_t len = strlen(entrada);
+                if (len > 0 && entrada[len - 1] == '\n') {
+                    entrada[len - 1] = '\0';
                 }
-                else
-                {
-                    printf("[COMANDO] - Comando não reconhecido: %s\n", entrada);
-                }
+
+                continua = VerificaComando(entrada);
             }
         }
 
