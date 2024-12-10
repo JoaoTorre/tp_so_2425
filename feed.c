@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
             {
                 printf("COMANDO SAIR\n");
                 strcpy(pedido.comando, comando);
-                nBytes_escritos = write(FeedPipe_fd, &pedido, sizeof(pedido));
+                nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                 if (nBytes_escritos == -1)
                 {
                     perror("[ERRO] ao escrever no pipe Feed");
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
                     printf("PidRemetente: %d\n", pedido.PidRemetente);
                     printf("Comando: %s\n", pedido.comando);
 
-                    nBytes_escritos = write(FeedPipe_fd, &pedido, sizeof(pedido));
+                    nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
                     strcpy(pedido.mensagem.topico, argumento1);
 
                     strcpy(pedido.comando, comando);
-                    nBytes_escritos = write(FeedPipe_fd, &pedido, sizeof(pedido));
+                    nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
             {
                 printf("COMANDO TOPICS\n");
                 strcpy(pedido.comando, comando);
-                nBytes_escritos = write(FeedPipe_fd, &pedido, sizeof(pedido));
+                nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                 if (nBytes_escritos == -1)
                 {
                     perror("[ERRO] ao escrever no pipe Feed");
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
                     strcpy(pedido.mensagem.topico, argumento1);
 
                     strcpy(pedido.comando, comando);
-                    nBytes_escritos = write(FeedPipe_fd, &pedido, sizeof(pedido));
+                    nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
