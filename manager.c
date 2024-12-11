@@ -63,153 +63,6 @@ void sair()
     exit(0);
 }
 
-// Função para verificar comandos
-int VerificaComando(char *str)
-{
-    toUpperString(str);
-
-    // Verifica se é o comando CLOSE
-    if (strcmp(str, "CLOSE") == 0)
-    {
-        printf("\n[MANAGER] Comando recebido: desligar.\n");
-        sair();
-        return 0;
-        // Verifica se é o comando USERS
-    }
-    else if (strcmp(str, "USERS") == 0)
-    {
-        printf("A mostrar listagem de utilizadores...\n");
-
-        // Verifica se é o comando TOPICS
-    }
-    else if (strcmp(str, "TOPICS") == 0)
-    {
-        printf("A mostrar a listagem de topicos...\n");
-
-        // Verifica se é o comando REMOVE
-    }
-    else if (strncmp(str, "REMOVE ", 7) == 0 || strcmp(str, "REMOVE") == 0)
-    {
-        int i = 7;
-        int encontrado = 0;
-        int contador = 0;
-        int len = strlen(str);
-        char remove_str[50] = {0}; // Inicializa com zeros
-
-        // Captura o utilizador
-        while (i < len && str[i] != ' ' && contador < sizeof(remove_str) - 1)
-        {
-            remove_str[contador++] = str[i++];
-        }
-        remove_str[contador] = '\0';
-
-        if (contador > 0)
-            encontrado += 1;
-
-        if (encontrado == 1)
-        {
-            printf("A remover utilizador %s ...\n", remove_str);
-        }
-        else
-        {
-            printf("Insira no formato: remove <username>\n");
-        }
-
-        // Verifica se é o comando SHOW
-    }
-    else if ((strncmp(str, "SHOW ", 5) == 0) || strcmp(str, "SHOW") == 0)
-    {
-        int i = 5;
-        int encontrado = 0;
-        int contador = 0;
-        int len = strlen(str);
-        char topico_str[50] = {0}; // Inicializa com zeros
-
-        // Captura o topico
-        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
-        {
-            topico_str[contador++] = str[i++];
-        }
-        topico_str[contador] = '\0';
-
-        if (contador > 0)
-            encontrado += 1;
-
-        if (encontrado == 1)
-        {
-            printf("A mostrar topico %s ...\n", topico_str);
-        }
-        else
-        {
-            printf("Insira no formato: show <topico>\n");
-        }
-
-        // Verifica se é o comando LOCK
-    }
-    else if ((strncmp(str, "LOCK ", 5) == 0) || strcmp(str, "LOCK") == 0)
-    {
-        int i = 5;
-        int encontrado = 0;
-        int contador = 0;
-        int len = strlen(str);
-        char topico_str[50] = {0}; // Inicializa com zeros
-
-        // Captura o topico
-        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
-        {
-            topico_str[contador++] = str[i++];
-        }
-        topico_str[contador] = '\0';
-
-        if (contador > 0)
-            encontrado += 1;
-
-        if (encontrado == 1)
-        {
-            printf("A bloquear topico %s ...\n", topico_str);
-        }
-        else
-        {
-            printf("Insira no formato: lock <topico>\n");
-        }
-
-        // Verifica se é o comando UNLOCK
-    }
-    else if ((strncmp(str, "UNLOCK ", 7) == 0) || strcmp(str, "UNLOCK") == 0)
-    {
-        int i = 7;
-        int encontrado = 0;
-        int contador = 0;
-        int len = strlen(str);
-        char topico_str[50] = {0}; // Inicializa com zeros
-
-        // Captura o topico
-        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
-        {
-            topico_str[contador++] = str[i++];
-        }
-        topico_str[contador] = '\0';
-
-        if (contador > 0)
-            encontrado += 1;
-
-        if (encontrado == 1)
-        {
-            printf("A desbloquear topico %s ...\n", topico_str);
-        }
-        else
-        {
-            printf("Insira no formato: unlock <topico>\n");
-        }
-    }
-
-    // Comando não reconhecido
-    else
-    {
-        printf("Comando não reconhecido: %s\n", str);
-    }
-}
-
 // Função para tratar sinais
 void handle_signal(int sig, siginfo_t *info, void *ucontext)
 {
@@ -295,6 +148,44 @@ void print_users()
     }
     pthread_mutex_unlock(&clientes_mutex);
 }
+
+
+// Função para Remover Utilizador
+void Remover_Utilizador(char nome_utilizador[]){
+    int feed_fifo_fd;
+    resposta_t resposta;
+    if(verifica_nome(nome_utilizador)){
+          CLIENT *current = users.clientes_registrados;
+          while (current != NULL) { // Percorre enquanto houver clientes
+                if (strcmp(current->user.nome, nome_utilizador) == 0) { // Comparação dos nomes
+                     printf("[MANAGER] utilizador Removido: %d \n",current->PidRemetente);  
+                     strcpy(resposta.resposta, EXIT);
+                     // Abrir FIFO do cliente
+                     feed_fifo_fd = abre_ClientPipe(current->PidRemetente);
+                        if (feed_fifo_fd == -1)
+                        {
+                            return;
+                        }
+
+                     // Enviar resposta para o cliente
+                        printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+                        if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                        {
+                            perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                        }
+
+                        return;    
+                }
+                current = current->nextClient; // Avança para o próximo cliente
+          }
+          printf("[MANAGER] utilizador Removido: %s \n",nome_utilizador);  
+         
+    }else{
+          printf("Utilizador não registado\n");
+    }
+}
+
 
 // Função para criar FIFO
 void Abrir_ManagerPipe(int *manager_fifo_fd)
@@ -426,7 +317,7 @@ void processa_pedido(int manager_fifo_fd)
 
         printf("[MANAGER] Novo cliente registrado: %s\n", newClient->user.nome);
 
-        // Adicionar feed à lista de registaados
+        // Adicionar feed à lista de registados
         adicionar_feed(newClient);
 
         // Abrir FIFO do cliente
@@ -922,6 +813,154 @@ void processa_pedido(int manager_fifo_fd)
     print_users();
 }
 
+
+// Função para verificar comandos
+int VerificaComando(char *str)
+{
+    toUpperString(str);
+
+    // Verifica se é o comando CLOSE
+    if (strcmp(str, "CLOSE") == 0)
+    {
+        printf("\n[MANAGER] Comando recebido: desligar.\n");
+        sair();
+        
+    // Verifica se é o comando USERS
+    }
+    else if (strcmp(str, "USERS") == 0)
+    {  
+       print_users();
+       
+    // Verifica se é o comando TOPICS
+    }
+    else if (strcmp(str, "TOPICS") == 0)
+    {
+       print_topicos();
+
+    // Verifica se é o comando REMOVE
+    }
+    else if (strncmp(str, "REMOVE ", 7) == 0 || strcmp(str, "REMOVE") == 0)
+    {
+        int i = 7;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char remove_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o utilizador
+        while (i < len && str[i] != ' ' && contador < sizeof(remove_str) - 1)
+        {
+            remove_str[contador++] = str[i++];
+        }
+        remove_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1)
+        {
+            Remover_Utilizador(remove_str);
+        }
+        else
+        {
+            printf("Insira no formato: remove <username>\n");
+        }
+
+        // Verifica se é o comando SHOW
+    }
+    else if ((strncmp(str, "SHOW ", 5) == 0) || strcmp(str, "SHOW") == 0)
+    {
+        int i = 5;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char topico_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o topico
+        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
+        {
+            topico_str[contador++] = str[i++];
+        }
+        topico_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1)
+        {
+            printf("A mostrar topico %s ...\n", topico_str);
+        }
+        else
+        {
+            printf("Insira no formato: show <topico>\n");
+        }
+
+        // Verifica se é o comando LOCK
+    }
+    else if ((strncmp(str, "LOCK ", 5) == 0) || strcmp(str, "LOCK") == 0)
+    {
+        int i = 5;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char topico_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o topico
+        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
+        {
+            topico_str[contador++] = str[i++];
+        }
+        topico_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1)
+        {
+            printf("A bloquear topico %s ...\n", topico_str);
+        }
+        else
+        {
+            printf("Insira no formato: lock <topico>\n");
+        }
+
+        // Verifica se é o comando UNLOCK
+    }
+    else if ((strncmp(str, "UNLOCK ", 7) == 0) || strcmp(str, "UNLOCK") == 0)
+    {
+        int i = 7;
+        int encontrado = 0;
+        int contador = 0;
+        int len = strlen(str);
+        char topico_str[50] = {0}; // Inicializa com zeros
+
+        // Captura o topico
+        while (i < len && str[i] != ' ' && contador < sizeof(topico_str) - 1)
+        {
+            topico_str[contador++] = str[i++];
+        }
+        topico_str[contador] = '\0';
+
+        if (contador > 0)
+            encontrado += 1;
+
+        if (encontrado == 1)
+        {
+            printf("A desbloquear topico %s ...\n", topico_str);
+        }
+        else
+        {
+            printf("Insira no formato: unlock <topico>\n");
+        }
+    }
+
+    // Comando não reconhecido
+    else
+    {
+        printf("Comando não reconhecido: %s\n", str);
+    }
+}
+
 // Função principal
 int main(int argc, char *argv[])
 {
@@ -952,7 +991,7 @@ int main(int argc, char *argv[])
 
     printf("\n[MANAGER] - Sistema iniciado. Aguardando comandos...\n");
 
-    while (continua)
+    while (1)
     {
         fdset_backup = fdset;
 
@@ -977,7 +1016,7 @@ int main(int argc, char *argv[])
                     entrada[len - 1] = '\0';
                 }
 
-                continua = VerificaComando(entrada);
+                VerificaComando(entrada);
             }
         }
 
