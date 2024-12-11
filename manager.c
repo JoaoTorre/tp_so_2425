@@ -149,43 +149,46 @@ void print_users()
     pthread_mutex_unlock(&clientes_mutex);
 }
 
-
 // Função para Remover Utilizador
-void Remover_Utilizador(char nome_utilizador[]){
+void Remover_Utilizador(char nome_utilizador[])
+{
     int feed_fifo_fd;
     resposta_t resposta;
-    if(verifica_nome(nome_utilizador)){
-          CLIENT *current = users.clientes_registrados;
-          while (current != NULL) { // Percorre enquanto houver clientes
-                if (strcmp(current->user.nome, nome_utilizador) == 0) { // Comparação dos nomes
-                     printf("[MANAGER] utilizador Removido: %d \n",current->PidRemetente);  
-                     strcpy(resposta.resposta, EXIT);
-                     // Abrir FIFO do cliente
-                     feed_fifo_fd = abre_ClientPipe(current->PidRemetente);
-                        if (feed_fifo_fd == -1)
-                        {
-                            return;
-                        }
-
-                     // Enviar resposta para o cliente
-                        printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
-
-                        if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
-                        {
-                            perror("[ERRO] - Falha ao enviar resposta para o cliente");
-                        }
-
-                        return;    
+    if (verifica_nome(nome_utilizador))
+    {
+        CLIENT *current = users.clientes_registrados;
+        while (current != NULL)
+        { // Percorre enquanto houver clientes
+            if (strcmp(current->user.nome, nome_utilizador) == 0)
+            { // Comparação dos nomes
+                printf("[MANAGER] utilizador Removido: %d \n", current->PidRemetente);
+                strcpy(resposta.resposta, EXIT);
+                // Abrir FIFO do cliente
+                feed_fifo_fd = abre_ClientPipe(current->PidRemetente);
+                if (feed_fifo_fd == -1)
+                {
+                    return;
                 }
-                current = current->nextClient; // Avança para o próximo cliente
-          }
-          printf("[MANAGER] utilizador Removido: %s \n",nome_utilizador);  
-         
-    }else{
-          printf("Utilizador não registado\n");
+
+                // Enviar resposta para o cliente
+                printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+                if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                {
+                    perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                }
+
+                return;
+            }
+            current = current->nextClient; // Avança para o próximo cliente
+        }
+        printf("[MANAGER] utilizador Removido: %s \n", nome_utilizador);
+    }
+    else
+    {
+        printf("Utilizador não registado\n");
     }
 }
-
 
 // Função para criar FIFO
 void Abrir_ManagerPipe(int *manager_fifo_fd)
@@ -707,6 +710,7 @@ void processa_pedido(int manager_fifo_fd)
 
             if (pedido.mensagem.duracao > 0)
             {
+
                 pthread_mutex_lock(&mensagens_mutex);
                 if (mensagens.num_mensagens < MAX_TOPICS_MSG_PERSIS)
                 {
@@ -813,9 +817,8 @@ void processa_pedido(int manager_fifo_fd)
     print_users();
 }
 
-
 // Função para verificar comandos
-int VerificaComando(char *str)
+void VerificaComando(char *str)
 {
     toUpperString(str);
 
@@ -824,20 +827,20 @@ int VerificaComando(char *str)
     {
         printf("\n[MANAGER] Comando recebido: desligar.\n");
         sair();
-        
-    // Verifica se é o comando USERS
+
+        // Verifica se é o comando USERS
     }
     else if (strcmp(str, "USERS") == 0)
-    {  
-       print_users();
-       
-    // Verifica se é o comando TOPICS
+    {
+        print_users();
+
+        // Verifica se é o comando TOPICS
     }
     else if (strcmp(str, "TOPICS") == 0)
     {
-       print_topicos();
+        print_topicos();
 
-    // Verifica se é o comando REMOVE
+        // Verifica se é o comando REMOVE
     }
     else if (strncmp(str, "REMOVE ", 7) == 0 || strcmp(str, "REMOVE") == 0)
     {
@@ -884,7 +887,9 @@ int VerificaComando(char *str)
         topico_str[contador] = '\0';
 
         if (contador > 0)
+        {
             encontrado += 1;
+        }
 
         if (encontrado == 1)
         {
@@ -915,16 +920,43 @@ int VerificaComando(char *str)
         if (contador > 0)
             encontrado += 1;
 
-        if (encontrado == 1)
+        if (encontrado != 1)
         {
-            printf("A bloquear topico %s ...\n", topico_str);
+            printf("Insira no formato: lock <topico>\n");
+            return;
+        }
+
+        printf("A bloquear topico %s ...\n", topico_str);
+
+        toUpperString(topico_str);
+
+        if (verifica_topico(topico_str) == 0)
+        {
+            printf("[INFO] - Topico não existe\n");
+            return;
+        }
+
+        int bloqueado_sucesso = 0;
+        pthread_mutex_lock(&topicos_mutex);
+        for (int i = 0; i < topicos.num_topicos; i++)
+        {
+            if (strcmp(topico_str, topicos.topicos[i].nome) == 0)
+            {
+                topicos.topicos[i].estado = BLOQUEADO;
+                bloqueado_sucesso = 1; // Marca como sucesso
+                break;
+            }
+        }
+        pthread_mutex_unlock(&topicos_mutex);
+
+        if (bloqueado_sucesso)
+        {
+            printf("[MANAGER] - Tópico '%s' bloqueado com sucesso.\n", topico_str);
         }
         else
         {
-            printf("Insira no formato: lock <topico>\n");
+            printf("[MANAGER] - Falha ao bloquear o tópico '%s'. Tópico não encontrado.\n", topico_str);
         }
-
-        // Verifica se é o comando UNLOCK
     }
     else if ((strncmp(str, "UNLOCK ", 7) == 0) || strcmp(str, "UNLOCK") == 0)
     {
@@ -942,15 +974,46 @@ int VerificaComando(char *str)
         topico_str[contador] = '\0';
 
         if (contador > 0)
-            encontrado += 1;
-
-        if (encontrado == 1)
         {
-            printf("A desbloquear topico %s ...\n", topico_str);
+            encontrado += 1;
+        }
+
+        if (encontrado != 1)
+        {
+            printf("Insira no formato: lock <topico>\n");
+            return;
+        }
+
+        printf("A bloquear topico %s ...\n", topico_str);
+
+        toUpperString(topico_str);
+
+        if (verifica_topico(topico_str) == 0)
+        {
+            printf("[INFO] - Topico não existe\n");
+            return;
+        }
+
+        int desbloqueado = 0;
+        pthread_mutex_lock(&topicos_mutex);
+        for (int i = 0; i < topicos.num_topicos; i++)
+        {
+            if (strcmp(topico_str, topicos.topicos[i].nome) == 0)
+            {
+                topicos.topicos[i].estado = DESBLOQUEADO;
+                desbloqueado = 1; // Marca como sucesso
+                break;
+            }
+        }
+        pthread_mutex_unlock(&topicos_mutex);
+
+        if (desbloqueado)
+        {
+            printf("[MANAGER] - Tópico '%s' desbloqueado com sucesso.\n", topico_str);
         }
         else
         {
-            printf("Insira no formato: unlock <topico>\n");
+            printf("[MANAGER] - Falha ao desbloquear o tópico '%s'. Tópico não encontrado.\n", topico_str);
         }
     }
 
