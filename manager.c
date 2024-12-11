@@ -288,7 +288,7 @@ void print_users()
         int i = atual->user.num_topicos;
         while (i > 0)
         {
-            printf("Topico: %s\n", atual->user.topicos[i - 1].nome);
+            printf("Topico: %s\n", atual->user.topicos.topicos[i - 1].nome);
             i--;
         }
         atual = atual->nextClient;
@@ -328,7 +328,7 @@ int verificaSubscricao(pedido_t pedido)
         {
             for (int i = 0; i < atual->user.num_topicos; i++)
             {
-                if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                if (strcmp(atual->user.topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
                 {
                     pthread_mutex_unlock(&clientes_mutex);
                     return 1; // Tópico subscrito
@@ -484,7 +484,7 @@ void processa_pedido(int manager_fifo_fd)
             {
                 if (atual->PidRemetente == pedido.PidRemetente)
                 {
-                    strcpy(atual->user.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
+                    strcpy(atual->user.topicos.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
                     atual->user.num_topicos++;
                     printf("[DEBUG] - Topico adicionado ao utilizador: %d\n", atual->user.num_topicos);
                     break;
@@ -542,6 +542,7 @@ void processa_pedido(int manager_fifo_fd)
             pthread_mutex_lock(&topicos_mutex);
             strcpy(topicos.topicos[topicos.num_topicos].nome, pedido.mensagem.topico);
             topicos.num_topicos++;
+            topicos.topicos[topicos.num_topicos - 1].estado = DESBLOQUEADO;
             pthread_mutex_unlock(&topicos_mutex);
 
             pthread_mutex_lock(&clientes_mutex);
@@ -550,7 +551,7 @@ void processa_pedido(int manager_fifo_fd)
             {
                 if (atual->PidRemetente == pedido.PidRemetente)
                 {
-                    strcpy(atual->user.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
+                    strcpy(atual->user.topicos.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
                     atual->user.num_topicos++;
                     break;
                 }
@@ -594,12 +595,12 @@ void processa_pedido(int manager_fifo_fd)
                 {
                     for (int i = 0; i < atual->user.num_topicos; i++)
                     {
-                        if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                        if (strcmp(atual->user.topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
                         {
                             aux = 1; // Tópico encontrado e será removido
                             for (int j = i; j < atual->user.num_topicos - 1; j++)
                             {
-                                strcpy(atual->user.topicos[j].nome, atual->user.topicos[j + 1].nome);
+                                strcpy(atual->user.topicos.topicos[j].nome, atual->user.topicos.topicos[j + 1].nome);
                             }
                             atual->user.num_topicos--;
                             break;
@@ -659,7 +660,7 @@ void processa_pedido(int manager_fifo_fd)
                 {
                     for (int i = 0; i < atual->user.num_topicos; i++)
                     {
-                        if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                        if (strcmp(atual->user.topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
                         {
                             topico_usado = 1; // Outro utilizador ainda possui o tópico
                             break;

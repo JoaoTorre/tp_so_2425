@@ -56,7 +56,6 @@ typedef struct
         DESBLOQUEADO,
         BLOQUEADO
     } estado;
-    // int estado; // 1 -> desbloqueado, 0 -> bloqueado
 } topico;
 
 // Estrutura para mensagens
@@ -86,9 +85,9 @@ typedef struct
 // Estrutura para representar um utilizador
 typedef struct
 {
-    topico topicos[MAX_TOPICS]; // Tópicos subscritos
-    char nome[TAM_NOME];        // Nome do utilizador
-    int num_topicos;            // Número de tópicos subscritos
+    topicos_t topicos;   // Tópicos subscritos
+    char nome[TAM_NOME]; // Nome do utilizador
+    int num_topicos;     // Número de tópicos subscritos
 } utilizador;
 
 // Estrutura de lista ligada de clientes
@@ -101,6 +100,7 @@ typedef struct client
 
 typedef struct
 {
+    topicos_t topicos;
     char resposta[TAM_MSG];
 } resposta_t;
 
