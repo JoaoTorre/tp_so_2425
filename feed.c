@@ -1,10 +1,31 @@
 #include "feed.h"
 
-void sair(int Managerpipe_fd, int FeedPipe_fd)
+int Managerpipe_fd = -1;
+int FeedPipe_fd = -1;
+
+void sair(int i)
 {
-    char nomePipe[100];
-    sprintf(nomePipe, FEED_FIFO, getpid());
-    unlink(nomePipe);
+    if (i == 0)
+    {
+        pedido_t pedido;
+        char nomePipe[100];
+        sprintf(nomePipe, FEED_FIFO, getpid());
+        unlink(nomePipe);
+
+        // avisar o manager que vai sair
+        printf("COMANDO SAIR\n");
+        pedido.PidRemetente = getpid();
+        strcpy(pedido.comando, "EXIT");
+        int nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
+
+        if (nBytes_escritos == -1)
+        {
+            perror("[ERRO] ao escrever no pipe Feed");
+        }
+
+        printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
+        printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
+    }
 
     // Fechar os pipes abertos
     if (Managerpipe_fd != -1)
@@ -59,6 +80,7 @@ void handle_signal(int sig, siginfo_t *info, void *ucontext)
 {
     // Apenas printar e sair
     printf("\n[SINAL RECEBIDO]: A encerrar o jogo...\n");
+    sair(0);
     exit(0);
 }
 
@@ -67,8 +89,6 @@ int main(int argc, char *argv[])
     int maxFd, n;
     char entrada[TAM_MSG], tempComando[TAM_MSG];
     int nBytes_escritos, nBytes_lidos;
-    int Managerpipe_fd = -1;
-    int FeedPipe_fd = -1;
     struct sigaction sa;
     pedido_t pedidoRegisto, pedido;
     resposta_t resposta;
@@ -103,7 +123,7 @@ int main(int argc, char *argv[])
     if (nBytes_escritos == -1)
     {
         perror("[ERRO] ao escrever no pipe Manager");
-        sair(Managerpipe_fd, FeedPipe_fd);
+        sair(0);
     }
 
     // Ler resposta
@@ -111,12 +131,17 @@ int main(int argc, char *argv[])
     if (nBytes_lidos == -1)
     {
         perror("[ERRO] ao ler do pipe Feed");
-        sair(Managerpipe_fd, FeedPipe_fd);
+        sair(0);
     }
 
     if (strstr(resposta.resposta, FEED_ACEITE) != NULL)
     {
         printf("\n[RESPOSTA]: %s\n", resposta.resposta);
+    }
+    else if (strstr(resposta.resposta, FEED_RECUSADO) != NULL || strstr(resposta.resposta, FEED_ESPERA) != NULL)
+    {
+        printf("\n[RESPOSTA]: %s\n", resposta.resposta);
+        sair(0);
     }
 
     while (1)
@@ -132,7 +157,7 @@ int main(int argc, char *argv[])
         if ((n = select(maxFd + 1, &fdset, NULL, NULL, NULL)) == -1)
         {
             perror("[ERRO] - Erro no select");
-            sair(Managerpipe_fd, FeedPipe_fd);
+            sair(0);
         }
 
         if (FD_ISSET(STDIN_FILENO, &fdset))
@@ -140,7 +165,7 @@ int main(int argc, char *argv[])
             if ((n = read(STDIN_FILENO, entrada, sizeof(entrada) - sizeof(char))) == -1)
             {
                 fprintf(stderr, "\n[ERRO] - Erro na leitura do stdin\n");
-                sair(Managerpipe_fd, FeedPipe_fd);
+                sair(0);
             }
 
             entrada[n - 1] = '\0';
@@ -174,22 +199,13 @@ int main(int argc, char *argv[])
 
             memset(&pedido, 0, sizeof(pedido));
             memset(&mensagem, 0, sizeof(mensagem_t));
+            pedido.PidRemetente = getpid();
 
-            if (strcmp(comando, "EXIT") == 0)
+            if (strcmp(comando, EXIT) == 0)
             {
-                printf("COMANDO SAIR\n");
-                strcpy(pedido.comando, comando);
-                nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
-                if (nBytes_escritos == -1)
-                {
-                    perror("[ERRO] ao escrever no pipe Feed");
-                    sair(Managerpipe_fd, FeedPipe_fd);
-                }
-                printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-                printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 break; // Garantir que o loop seja encerrado após o envio do comando
             }
-            else if (strcmp(comando, "MSG") == 0)
+            else if (strcmp(comando, MSG) == 0)
             {
                 if (argumento1 == NULL || argumento2 == NULL || argumento3 == NULL)
                 {
@@ -201,7 +217,6 @@ int main(int argc, char *argv[])
                     strcpy(pedido.mensagem.topico, argumento1);
                     pedido.mensagem.duracao = atoi(argumento2);
                     strcpy(pedido.mensagem.mensagem, argumento3);
-                    pedido.PidRemetente = getpid();
                     strcpy(pedido.comando, comando);
 
                     // Enviar a mensagem para o Manager pelo FIFO do cliente
@@ -215,26 +230,25 @@ int main(int argc, char *argv[])
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
-                        sair(Managerpipe_fd, FeedPipe_fd);
+                        sair(0);
                     }
                     printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
                     printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
             }
-            else if (strcmp(comando, "SUBSCRIBE") == 0)
+            else if (strcmp(comando, SUBSCRIBE) == 0)
             {
                 if (argumento1 != NULL && argumento2 == NULL && argumento3 == NULL)
                 {
                     printf("\n[COMANDO SUBSCRIBE] - Subscribindo ao tópico '%s'\n", argumento1);
                     // Enviar a subscrição para o Manager, se necessário
                     strcpy(pedido.mensagem.topico, argumento1);
-
                     strcpy(pedido.comando, comando);
                     nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
-                        sair(Managerpipe_fd, FeedPipe_fd);
+                        sair(0);
                     }
                     printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
                     printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
@@ -244,7 +258,7 @@ int main(int argc, char *argv[])
                     printf("\n[ERRO] - Falta o nome do tópico após 'SUBSCRIBE'\n");
                 }
             }
-            else if (strcmp(comando, "TOPICS") == 0)
+            else if (strcmp(comando, TOPICS) == 0)
             {
                 printf("COMANDO TOPICS\n");
                 strcpy(pedido.comando, comando);
@@ -252,12 +266,12 @@ int main(int argc, char *argv[])
                 if (nBytes_escritos == -1)
                 {
                     perror("[ERRO] ao escrever no pipe Feed");
-                    sair(Managerpipe_fd, FeedPipe_fd);
+                    sair(0);
                 }
                 printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
                 printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
             }
-            else if (strcmp(comando, "UNSUBSCRIBE") == 0)
+            else if (strcmp(comando, UNSUBSCRIBE) == 0)
             {
                 if (argumento1 != NULL && argumento2 == NULL && argumento3 == NULL)
                 {
@@ -270,7 +284,7 @@ int main(int argc, char *argv[])
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
-                        sair(Managerpipe_fd, FeedPipe_fd);
+                        sair(0);
                     }
                     printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
                     printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
@@ -290,17 +304,21 @@ int main(int argc, char *argv[])
         if (FD_ISSET(FeedPipe_fd, &fdset))
         {
             nBytes_lidos = read(FeedPipe_fd, &resposta, sizeof(resposta));
-            if (nBytes_lidos > 0)
-            {
-                printf("[FEED] - Resposta recebida: %s\n", resposta.resposta);
-            }
-            else if (nBytes_lidos == -1)
+            if (nBytes_lidos == -1)
             {
                 perror("[ERRO] - Falha ao ler do FIFO Feed");
-                sair(Managerpipe_fd, FeedPipe_fd);
+                sair(0);
             }
+
+            if (strcmp(resposta.resposta, EXIT) == 0)
+            {
+                printf("\n[FEED] - A encerrar...\n");
+                sair(1);
+            }
+
+            printf("\n[FEED] - Resposta recebida: %s\n", resposta.resposta);
         }
     }
-    sair(Managerpipe_fd, FeedPipe_fd);
+    sair(0);
     return 0;
 }

@@ -10,10 +10,11 @@
 
 // Constantes para o sistema
 #define MAX_USERS 10            // Máximo de utilizadores
-#define MAX_TOPICS 20           // Máximo de tópicos
+#define MAX_TOPICS 1            // Máximo de tópicos
 #define MAX_TOPICS_MSG_PERSIS 5 // Máximo de mensagens persistentes por tópico
 #define TAM_NOME 100            // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
+#define TOPIC_LENGTH 100        // Máximo de caracteres no nome do tópico
 
 // Nome do FIFO do manager
 #define MANAGER_FIFO "/tmp/manager_fifo"
@@ -31,6 +32,9 @@
 #define TOPICO_BLOQUEADO "O topico encontra-se bloqueado\n"
 #define TOPICO_MAXIMO "Maximo de topicos atingido\n"
 #define TOPICO_MAX_MSG_PERSISTENTES "Maximo de mensagens persistentes referentes a este topico atingido\n"
+#define TOPICO_SUBSCRITO "Topico subscrito com sucesso\n"
+#define TOPICO_UNSUBSCRIBE "Topico removido com sucesso\n"
+#define TOPICO_NAO_SUBSCRITO "O topico nao se encontra subscrito\n"
 
 // ---- COMANDOS ----
 #define TOPICS "TOPICS"
@@ -49,6 +53,13 @@ typedef struct
     char mensagem[TAM_MSG]; // Corpo da mensagem
 } mensagem_t;
 
+// estrutura para guardar topicos
+typedef struct
+{
+    char topico[MAX_TOPICS][TOPIC_LENGTH];
+    int num_topicos;
+} topicos_t;
+
 // Estrutura para pedidos (mensagem enviada por um utilizador)
 typedef struct
 {
@@ -61,12 +72,8 @@ typedef struct
 // Estrutura para representar um utilizador
 typedef struct
 {
-    pid_t pid;                    // PID do utilizador
-    char nome[TAM_NOME];          // Nome do utilizador
-    pthread_t th;                 // Thread do utilizador
-    pthread_mutex_t *user_trinco; // Ponteiro para mutex do utilizador
-    int threadEsperada;           // Estado da thread esperada
-    int registado;                // Flag indicando se o utilizador está registado
+    topicos_t topicos;   // Tópicos subscritos
+    char nome[TAM_NOME]; // Nome do utilizador
 } utilizador;
 
 // Estrutura de lista ligada de clientes
@@ -81,6 +88,20 @@ typedef struct
 {
     char resposta[TAM_MSG];
 } resposta_t;
+
+// estrutura para guardar utilizadores no sistema
+typedef struct
+{
+    CLIENT *clientes_registrados;
+    int num_utilizadores;
+} users_t;
+
+// estrutura para guardar mensagens persistentes
+typedef struct
+{
+    mensagem_t mensagens[MAX_TOPICS_MSG_PERSIS];
+    int num_mensagens;
+} mensagens_persist_t;
 
 // ---- DECLARAÇÕES DE FUNÇÕES ----
 void toUpperString(char *str);
