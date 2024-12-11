@@ -449,6 +449,23 @@ void processa_pedido(int manager_fifo_fd)
     else if (strcmp(pedido.comando, TOPICS) == 0)
     {
         printf("[MANAGER] - Comando TOPICS recebido.\n");
+        resposta.topicos = topicos;
+        strcpy(resposta.resposta, TOPICS);
+
+        // Abrir FIFO do cliente
+        feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+        if (feed_fifo_fd == -1)
+        {
+            perror("[ERRO] - Falha ao abrir FIFO do cliente");
+            return;
+        }
+
+        // Enviar resposta para o cliente
+        printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+        if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+        {
+            perror("[ERRO] - Falha ao enviar resposta para o cliente");
+        }
     }
     else if (strcmp(pedido.comando, SUBSCRIBE) == 0)
     {

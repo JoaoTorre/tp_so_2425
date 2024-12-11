@@ -315,8 +315,18 @@ int main(int argc, char *argv[])
                 printf("\n[FEED] - A encerrar...\n");
                 sair(1);
             }
-
-            printf("\n[FEED] - Resposta recebida: %s\n", resposta.resposta);
+            else if (strcmp(resposta.resposta, TOPICS) == 0)
+            {
+                printf("\n[FEED] - Tópicos subscritos:\n");
+                for (int i = 0; i < resposta.topicos.num_topicos; i++)
+                {
+                    printf("Tópico: %s | Nº msg: %d | Estado: %s\n", resposta.topicos.topicos[i].nome, resposta.topicos.topicos[i].num_mensagens, (resposta.topicos.topicos[i].estado == DESBLOQUEADO) ? "DESBLOQUEADO" : "BLOQUEADO");
+                }
+            }
+            else
+            {
+                printf("\n[FEED] - Resposta recebida: %s\n", resposta.resposta);
+            }
         }
     }
     sair(0);
