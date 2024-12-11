@@ -13,7 +13,6 @@ void sair(int i)
         unlink(nomePipe);
 
         // avisar o manager que vai sair
-        printf("COMANDO SAIR\n");
         pedido.PidRemetente = getpid();
         strcpy(pedido.comando, "EXIT");
         int nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
@@ -22,9 +21,6 @@ void sair(int i)
         {
             perror("[ERRO] ao escrever no pipe Feed");
         }
-
-        printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-        printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
     }
 
     // Fechar os pipes abertos
@@ -222,28 +218,18 @@ int main(int argc, char *argv[])
                     strcpy(pedido.mensagem.mensagem, argumento3);
                     strcpy(pedido.comando, comando);
 
-                    // Enviar a mensagem para o Manager pelo FIFO do cliente
-                    printf("Dados do pedido:\n");
-                    printf("Duracao: %d\n", pedido.mensagem.duracao);
-                    printf("Mensagem: %s\n", pedido.mensagem.mensagem);
-                    printf("PidRemetente: %d\n", pedido.PidRemetente);
-                    printf("Comando: %s\n", pedido.comando);
-
                     nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                     if (nBytes_escritos == -1)
                     {
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(0);
                     }
-                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
             }
             else if (strcmp(comando, SUBSCRIBE) == 0)
             {
                 if (argumento1 != NULL && argumento2 == NULL && argumento3 == NULL)
                 {
-                    printf("\n[COMANDO SUBSCRIBE] - Subscribindo ao tópico '%s'\n", argumento1);
                     // Enviar a subscrição para o Manager, se necessário
                     strcpy(pedido.mensagem.topico, argumento1);
                     strcpy(pedido.comando, comando);
@@ -253,8 +239,6 @@ int main(int argc, char *argv[])
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(0);
                     }
-                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
                 else
                 {
@@ -263,7 +247,6 @@ int main(int argc, char *argv[])
             }
             else if (strcmp(comando, TOPICS) == 0)
             {
-                printf("COMANDO TOPICS\n");
                 strcpy(pedido.comando, comando);
                 nBytes_escritos = write(Managerpipe_fd, &pedido, sizeof(pedido));
                 if (nBytes_escritos == -1)
@@ -271,14 +254,11 @@ int main(int argc, char *argv[])
                     perror("[ERRO] ao escrever no pipe Feed");
                     sair(0);
                 }
-                printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-                printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
             }
             else if (strcmp(comando, UNSUBSCRIBE) == 0)
             {
                 if (argumento1 != NULL && argumento2 == NULL && argumento3 == NULL)
                 {
-                    printf("\n[COMANDO unsubscribe] - Subscribindo ao tópico '%s'\n", argumento1);
                     // Enviar a subscrição para o Manager, se necessário
                     strcpy(pedido.mensagem.topico, argumento1);
 
@@ -289,8 +269,6 @@ int main(int argc, char *argv[])
                         perror("[ERRO] ao escrever no pipe Feed");
                         sair(0);
                     }
-                    printf("[INFO] - nBytes_escritos: %d\n", nBytes_escritos);
-                    printf("[INFO] - Tamanho da estrutura pedido: %zu bytes\n", sizeof(pedido));
                 }
 
                 else
