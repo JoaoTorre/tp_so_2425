@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     pedidoRegisto.nome_user[TAM_NOME - 1] = '\0'; // Garantir terminação nula
     strncpy(pedidoRegisto.comando, PEDIDO_PARA_JOGAR, TAM_NOME - 1);
     pedidoRegisto.comando[TAM_NOME - 1] = '\0';
-
+    toUpperString(pedidoRegisto.nome_user);
     printf("Sessão iniciada\nNome de utilizador: %s\n", pedidoRegisto.nome_user);
 
     /* Enviar dados ao servidor */
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
             }
             else if (strcmp(resposta.resposta, TOPICS) == 0)
             {
-                printf("\n[FEED] - Tópicos subscritos:\n");
+                printf("\n[FEED] - Tópicos existentes:\n");
                 for (int i = 0; i < resposta.topicos.num_topicos; i++)
                 {
                     printf("Tópico: %s | Nº msg: %d | Estado: %s\n", resposta.topicos.topicos[i].nome, resposta.topicos.topicos[i].num_mensagens, (resposta.topicos.topicos[i].estado == DESBLOQUEADO) ? "DESBLOQUEADO" : "BLOQUEADO");

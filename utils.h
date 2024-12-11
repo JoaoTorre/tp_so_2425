@@ -101,7 +101,7 @@ typedef struct client
 typedef struct
 {
     topicos_t topicos;
-    char resposta[TAM_MSG];
+    char resposta[TAM_MSG + TOPIC_LENGTH + 1];
 } resposta_t;
 
 // estrutura para guardar utilizadores no sistema
