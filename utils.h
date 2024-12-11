@@ -10,7 +10,7 @@
 
 // Constantes para o sistema
 #define MAX_USERS 10            // Máximo de utilizadores
-#define MAX_TOPICS 1            // Máximo de tópicos
+#define MAX_TOPICS 20           // Máximo de tópicos
 #define MAX_TOPICS_MSG_PERSIS 5 // Máximo de mensagens persistentes por tópico
 #define TAM_NOME 100            // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
@@ -35,6 +35,8 @@
 #define TOPICO_SUBSCRITO "Topico subscrito com sucesso\n"
 #define TOPICO_UNSUBSCRIBE "Topico removido com sucesso\n"
 #define TOPICO_NAO_SUBSCRITO "O topico nao se encontra subscrito\n"
+#define TOPICO_NAO_EXISTE "O topico nao existe\n"
+#define TOPICO_JA_SUBSCRITO "O topico ja se encontra subscrito\n"
 
 // ---- COMANDOS ----
 #define TOPICS "TOPICS"
@@ -44,6 +46,18 @@
 #define EXIT "EXIT"
 
 // ---- ESTRUTURAS DE DADOS ----
+
+typedef struct
+{
+    char nome[TOPIC_LENGTH];
+    int num_mensagens;
+    enum
+    {
+        DESBLOQUEADO,
+        BLOQUEADO
+    } estado;
+    // int estado; // 1 -> desbloqueado, 0 -> bloqueado
+} topico;
 
 // Estrutura para mensagens
 typedef struct
@@ -56,7 +70,7 @@ typedef struct
 // estrutura para guardar topicos
 typedef struct
 {
-    char topico[MAX_TOPICS][TOPIC_LENGTH];
+    topico topicos[MAX_TOPICS];
     int num_topicos;
 } topicos_t;
 
@@ -72,8 +86,9 @@ typedef struct
 // Estrutura para representar um utilizador
 typedef struct
 {
-    topicos_t topicos;   // Tópicos subscritos
-    char nome[TAM_NOME]; // Nome do utilizador
+    topico topicos[MAX_TOPICS]; // Tópicos subscritos
+    char nome[TAM_NOME];        // Nome do utilizador
+    int num_topicos;            // Número de tópicos subscritos
 } utilizador;
 
 // Estrutura de lista ligada de clientes

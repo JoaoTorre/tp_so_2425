@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    printf("\n[ERRO] - Falta o nome do tópico após 'SUBSCRIBE'\n");
+                    printf("\n[ERRO] - Falta o nome do tópico após 'subscribe <topico>'\n");
                 }
             }
             else if (strcmp(comando, TOPICS) == 0)
@@ -292,7 +292,7 @@ int main(int argc, char *argv[])
 
                 else
                 {
-                    printf("\n[ERRO] - Falta o nome do tópico após 'unsubscribe'\n");
+                    printf("\n[ERRO] - Falta o nome do tópico após 'unsubscribe <topico>'\n");
                 }
             }
             else

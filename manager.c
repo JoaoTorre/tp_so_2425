@@ -223,7 +223,7 @@ int verifica_topico(char topico[])
     pthread_mutex_lock(&topicos_mutex);
     for (int i = 0; i < topicos.num_topicos; i++)
     {
-        if (strcmp(topico, topicos.topico[i]) == 0)
+        if (strcmp(topico, topicos.topicos[i].nome) == 0) // Corrigido o acesso
         {
             pthread_mutex_unlock(&topicos_mutex);
             return 1; // Tópico existe
@@ -270,7 +270,7 @@ void print_topicos()
     printf("Lista de topicos:\n");
     for (int i = 0; i < topicos.num_topicos; i++)
     {
-        printf("Topico: %s\n", topicos.topico[i]);
+        printf("Topico: %s\n", topicos.topicos[i].nome);
     }
     pthread_mutex_unlock(&topicos_mutex);
 }
@@ -285,10 +285,11 @@ void print_users()
     {
         printf("Nome: %s, PID: %d\n", atual->user.nome, atual->PidRemetente);
         printf("TOPICOS SUBSCRITOS:\n");
-        while (atual->user.topicos.num_topicos > 0)
+        int i = atual->user.num_topicos;
+        while (i > 0)
         {
-            printf("Topico: %s\n", atual->user.topicos.topico[atual->user.topicos.num_topicos - 1]);
-            atual->user.topicos.num_topicos--;
+            printf("Topico: %s\n", atual->user.topicos[i - 1].nome);
+            i--;
         }
         atual = atual->nextClient;
     }
@@ -314,6 +315,31 @@ void Abrir_ManagerPipe(int *manager_fifo_fd)
     }
 
     printf("\n[MANAGER] - FIFO aberto para leitura e escrita.\n");
+}
+
+// Função para verificar se o utilizar subscreveu topico
+int verificaSubscricao(pedido_t pedido)
+{
+    pthread_mutex_lock(&clientes_mutex);
+    CLIENT *atual = users.clientes_registrados;
+    while (atual)
+    {
+        if (atual->PidRemetente == pedido.PidRemetente)
+        {
+            for (int i = 0; i < atual->user.num_topicos; i++)
+            {
+                if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                {
+                    pthread_mutex_unlock(&clientes_mutex);
+                    return 1; // Tópico subscrito
+                }
+            }
+            break;
+        }
+        atual = atual->nextClient;
+    }
+    pthread_mutex_unlock(&clientes_mutex);
+    return 0; // topico nao subscrito
 }
 
 // Função para processar pedido do Manager
@@ -394,6 +420,7 @@ void processa_pedido(int manager_fifo_fd)
         pthread_mutex_lock(&clientes_mutex);
         newClient->PidRemetente = pedido.PidRemetente;
         strcpy(newClient->user.nome, pedido.nome_user);
+        newClient->user.num_topicos = 0;
         newClient->nextClient = NULL;
         pthread_mutex_unlock(&clientes_mutex);
 
@@ -429,6 +456,27 @@ void processa_pedido(int manager_fifo_fd)
 
         if (verifica_topico(pedido.mensagem.topico))
         {
+            if (verificaSubscricao(pedido))
+            {
+                strcpy(resposta.resposta, TOPICO_JA_SUBSCRITO);
+
+                // Abrir FIFO do cliente
+                feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+                if (feed_fifo_fd == -1)
+                {
+                    free(newClient);
+                    return;
+                }
+
+                // Enviar resposta para o cliente
+                printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+                if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                {
+                    perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                }
+                return;
+            }
             // se existir, adiciona o topico ao utilizador
             pthread_mutex_lock(&clientes_mutex);
             CLIENT *atual = users.clientes_registrados;
@@ -436,8 +484,9 @@ void processa_pedido(int manager_fifo_fd)
             {
                 if (atual->PidRemetente == pedido.PidRemetente)
                 {
-                    strcpy(atual->user.topicos.topico[atual->user.topicos.num_topicos], pedido.mensagem.topico);
-                    atual->user.topicos.num_topicos++;
+                    strcpy(atual->user.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
+                    atual->user.num_topicos++;
+                    printf("[DEBUG] - Topico adicionado ao utilizador: %d\n", atual->user.num_topicos);
                     break;
                 }
                 atual = atual->nextClient;
@@ -491,7 +540,7 @@ void processa_pedido(int manager_fifo_fd)
 
             // cria o topico e associa ao cliente
             pthread_mutex_lock(&topicos_mutex);
-            strcpy(topicos.topico[topicos.num_topicos], pedido.mensagem.topico);
+            strcpy(topicos.topicos[topicos.num_topicos].nome, pedido.mensagem.topico);
             topicos.num_topicos++;
             pthread_mutex_unlock(&topicos_mutex);
 
@@ -501,8 +550,8 @@ void processa_pedido(int manager_fifo_fd)
             {
                 if (atual->PidRemetente == pedido.PidRemetente)
                 {
-                    strcpy(atual->user.topicos.topico[atual->user.topicos.num_topicos], pedido.mensagem.topico);
-                    atual->user.topicos.num_topicos++;
+                    strcpy(atual->user.topicos[atual->user.num_topicos].nome, pedido.mensagem.topico);
+                    atual->user.num_topicos++;
                     break;
                 }
                 atual = atual->nextClient;
@@ -531,10 +580,153 @@ void processa_pedido(int manager_fifo_fd)
     }
     else if (strcmp(pedido.comando, UNSUBSCRIBE) == 0)
     {
-        // verificar se o topico está subscrito
-        // se estiver retira
-        // se não estiver informa o cliente
         printf("[MANAGER] - Comando UNSUBSCRIBE recebido.\n");
+
+        if (verifica_topico(pedido.mensagem.topico))
+        {
+            // Tópico existe -> verificar se o cliente está subscrito
+            int aux = 0;
+            pthread_mutex_lock(&clientes_mutex);
+            CLIENT *atual = users.clientes_registrados;
+            while (atual)
+            {
+                if (atual->PidRemetente == pedido.PidRemetente)
+                {
+                    for (int i = 0; i < atual->user.num_topicos; i++)
+                    {
+                        if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                        {
+                            aux = 1; // Tópico encontrado e será removido
+                            for (int j = i; j < atual->user.num_topicos - 1; j++)
+                            {
+                                strcpy(atual->user.topicos[j].nome, atual->user.topicos[j + 1].nome);
+                            }
+                            atual->user.num_topicos--;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                atual = atual->nextClient;
+            }
+            pthread_mutex_unlock(&clientes_mutex);
+
+            if (aux == 0)
+            {
+                // Cliente não está subscrito no tópico
+                strcpy(resposta.resposta, TOPICO_NAO_SUBSCRITO);
+
+                // Abrir FIFO do cliente
+                feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+                if (feed_fifo_fd == -1)
+                {
+                    perror("[ERRO] - Falha ao abrir FIFO do cliente");
+                    return;
+                }
+
+                // Enviar resposta para o cliente
+                printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+                if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                {
+                    perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                }
+            }
+            else
+            {
+                // Tópico existe mandar resposta ao cliente a dizer que foi apagado
+                strcpy(resposta.resposta, TOPICO_UNSUBSCRIBE);
+
+                // Abrir FIFO do cliente
+                feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+                if (feed_fifo_fd == -1)
+                {
+                    perror("[ERRO] - Falha ao abrir FIFO do cliente");
+                    return;
+                }
+
+                // Enviar resposta para o cliente
+                printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+                if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+                {
+                    perror("[ERRO] - Falha ao enviar resposta para o cliente");
+                }
+
+                // Verificar se outros utilizadores ainda possuem o tópico
+                pthread_mutex_lock(&clientes_mutex);
+                atual = users.clientes_registrados;
+                int topico_usado = 0;
+                while (atual)
+                {
+                    for (int i = 0; i < atual->user.num_topicos; i++)
+                    {
+                        if (strcmp(atual->user.topicos[i].nome, pedido.mensagem.topico) == 0)
+                        {
+                            topico_usado = 1; // Outro utilizador ainda possui o tópico
+                            break;
+                        }
+                    }
+                    if (topico_usado)
+                    {
+                        break;
+                    }
+                    atual = atual->nextClient;
+                }
+                pthread_mutex_unlock(&clientes_mutex);
+
+                if (topico_usado)
+                {
+                    return;
+                }
+
+                // Verificar mensagens persistentes com o tópico
+                pthread_mutex_lock(&mensagens_mutex);
+                for (int i = 0; i < mensagens.num_mensagens; i++)
+                {
+                    if (strcmp(mensagens.mensagens[i].topico, pedido.mensagem.topico) == 0)
+                    {
+                        pthread_mutex_unlock(&mensagens_mutex);
+                        return; // Há mensagens persistentes
+                    }
+                }
+                pthread_mutex_unlock(&mensagens_mutex);
+
+                // Remover o tópico da lista de tópicos globais
+                pthread_mutex_lock(&topicos_mutex);
+                for (int i = 0; i < topicos.num_topicos; i++)
+                {
+                    if (strcmp(topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
+                    {
+                        for (int j = i; j < topicos.num_topicos - 1; j++)
+                        {
+                            strcpy(topicos.topicos[j].nome, topicos.topicos[j + 1].nome);
+                        }
+                        topicos.num_topicos--;
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&topicos_mutex);
+            }
+        }
+        else
+        {
+            // Tópico não existe
+            strcpy(resposta.resposta, TOPICO_NAO_EXISTE);
+
+            // Abrir FIFO do cliente
+            feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+            if (feed_fifo_fd == -1)
+            {
+                perror("[ERRO] - Falha ao abrir FIFO do cliente");
+                return;
+            }
+
+            // Enviar resposta para o cliente
+            printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+            if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+            {
+                perror("[ERRO] - Falha ao enviar resposta para o cliente");
+            }
+        }
     }
     else if (strcmp(pedido.comando, MSG) == 0)
     {
