@@ -1,6 +1,7 @@
 #include "manager.h"
 
 int manager_fifo_fd;
+int CONTROLADOR = 1;
 pthread_mutex_t mensagens_mutex; // Mutex para proteger a lista de mensagens
 pthread_mutex_t topicos_mutex;   // Mutex para proteger a lista de topicos
 pthread_mutex_t clientes_mutex;  // Mutex para proteger a lista de clientes registados
@@ -60,7 +61,7 @@ void sair()
     pthread_mutex_destroy(&mensagens_mutex);
     pthread_mutex_destroy(&topicos_mutex);
     printf("\n[MANAGER] - Motor desligado. Até breve!\n");
-    exit(0);
+    CONTROLADOR = 0;
 }
 
 // Função para tratar sinais
@@ -85,6 +86,26 @@ int verifica_topico(char topico[])
 
     pthread_mutex_unlock(&topicos_mutex);
     return 0; // Tópico não existe
+}
+
+// Função para Mostrar Mensagens de Tópico
+void Mostrar_MensagensTopico(char topico[])
+{
+
+    if (verifica_topico(topico))
+    {
+        for (int i = 0; i < mensagens.num_mensagens; i++)
+        {
+            if (strcmp(mensagens.mensagens[i].topico, topico) == 0)
+            {
+                printf("Mensagem: %s (Duração: %d)\n", mensagens.mensagens[i].mensagem, mensagens.mensagens[i].duracao);
+            }
+        }
+    }
+    else
+    {
+        printf("[MANAGER] topico não registado\n");
+    }
 }
 
 // Função para verificar se o nome já está a ser usado
@@ -126,6 +147,108 @@ void print_topicos()
         printf("Topico: %s\n", topicos.topicos[i].nome);
     }
     pthread_mutex_unlock(&topicos_mutex);
+}
+
+// Escrever ficheiro txt
+void writeFile()
+{
+    FILE *file;
+    char *filename = getenv("MSG_FICH");
+    if (filename == NULL)
+    {
+        printf("\nVariável de ambiente MSG_FICH não definida.\n");
+        return;
+    }
+
+    printf("[DEBUG] - Nome do arquivo: %s\n", filename);
+
+    file = fopen(filename, "w");
+
+    if (file == NULL)
+    {
+        printf("\nNão foi possível abrir o arquivo.\n");
+        return;
+    }
+
+    printf("[DEBUG] - Arquivo aberto com sucesso.\n");
+
+    pthread_mutex_lock(&mensagens_mutex);
+    for (int i = 0; i < mensagens.num_mensagens; i++)
+    {
+        printf("[DEBUG] - Escrevendo mensagem %d: %s %s %d %s\n", i, mensagens.mensagens[i].topico, mensagens.mensagens[i].username, mensagens.mensagens[i].duracao, mensagens.mensagens[i].mensagem);
+        fprintf(file, "%s %s %d %s\n", mensagens.mensagens[i].topico, mensagens.mensagens[i].username, mensagens.mensagens[i].duracao, mensagens.mensagens[i].mensagem);
+    }
+    pthread_mutex_unlock(&mensagens_mutex);
+
+    fclose(file);
+    printf("Escrito com sucesso\n");
+}
+
+// Ler ficheiro txt
+void readFile()
+{
+    FILE *file;
+    char linha[400];
+    int count = 0;
+
+    char *filename = getenv("MSG_FICH");
+    if (filename == NULL)
+    {
+        printf("\nVariável de ambiente MSG_FICH não definida.\n");
+        return;
+    }
+
+    file = fopen(filename, "r");
+
+    if (file == NULL)
+    {
+        printf("\nNão foi possível abrir o arquivo.\n");
+        return;
+    }
+
+    // Ler o arquivo
+    while (fgets(linha, sizeof(linha), file) != NULL)
+    {
+        linha[strcspn(linha, "\r\n")] = '\0';
+        mensagem_t msg;
+        if (sscanf(linha, "%29s %19s %d %299[^\n]", msg.topico, msg.username, &msg.duracao, msg.mensagem) == 4)
+        {
+            toUpperString(msg.topico);
+            toUpperString(msg.username);
+            int topico_existe = 0;
+
+            pthread_mutex_lock(&topicos_mutex);
+            for (int i = 0; i < topicos.num_topicos; i++)
+            {
+                if (strcmp(topicos.topicos[i].nome, msg.topico) == 0)
+                {
+                    topico_existe = 1;
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&topicos_mutex);
+
+            if (!topico_existe)
+            {
+                pthread_mutex_lock(&topicos_mutex);
+                strcpy(topicos.topicos[topicos.num_topicos].nome, msg.topico);
+                topicos.num_topicos++;
+                pthread_mutex_unlock(&topicos_mutex);
+            }
+
+            pthread_mutex_lock(&mensagens_mutex);
+            mensagens.mensagens[mensagens.num_mensagens] = msg;
+            mensagens.num_mensagens++;
+            pthread_mutex_unlock(&mensagens_mutex);
+        }
+        else
+        {
+            printf("Erro ao ler a linha: %s \n", linha);
+        }
+    }
+
+    fclose(file);
+    printf("Lido com sucesso\n");
 }
 
 // Função para imprimir todos os utilizadores registados
@@ -708,7 +831,7 @@ void processa_pedido(int manager_fifo_fd)
                 return;
             }
 
-            if (pedido.mensagem.duracao > 0)
+                        if (pedido.mensagem.duracao > 0)
             {
 
                 int num_msg = 0;
@@ -731,7 +854,7 @@ void processa_pedido(int manager_fifo_fd)
 
                     strncpy(mensagens.mensagens[mensagens.num_mensagens].mensagem, pedido.mensagem.mensagem, TAM_MSG - 1);
                     mensagens.mensagens[mensagens.num_mensagens].mensagem[TAM_MSG - 1] = '\0';
-
+                    strncpy(mensagens.mensagens[mensagens.num_mensagens].username, pedido.mensagem.username, TAM_NOME - 1);
                     mensagens.mensagens[mensagens.num_mensagens].duracao = pedido.mensagem.duracao;
                     mensagens.num_mensagens++;
                 }
@@ -765,8 +888,7 @@ void processa_pedido(int manager_fifo_fd)
                             continue;
                         }
 
-                        snprintf(resposta.resposta, sizeof(resposta.resposta), "%s: %s",
-                                 pedido.mensagem.topico, pedido.mensagem.mensagem);
+                        snprintf(resposta.resposta, sizeof(resposta.resposta), "%s para %s: %s", pedido.mensagem.username, pedido.mensagem.topico, pedido.mensagem.mensagem);
 
                         if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
                         {
@@ -924,7 +1046,8 @@ void VerificaComando(char *str)
             printf("Insira no formato: show <topico>\n");
         }
 
-        // Verifica se é o comando LOCK
+        toUpperString(topico_str);
+        Mostrar_MensagensTopico(topico_str);
     }
     else if ((strncmp(str, "LOCK ", 5) == 0) || strcmp(str, "LOCK") == 0)
     {
@@ -1048,12 +1171,48 @@ void VerificaComando(char *str)
     }
 }
 
+void *thread_contador(void *arg)
+{
+    ThreadControl *control = (ThreadControl *)arg;
+
+    while (control->running)
+    {
+        sleep(1);
+
+        // verificar se o tempo da mensagem chegou ao fim, se chegou remover a mensagem
+        pthread_mutex_lock(&mensagens_mutex);
+        for (int i = 0; i < mensagens.num_mensagens; i++)
+        {
+            if (mensagens.mensagens[i].duracao > 0)
+            {
+                mensagens.mensagens[i].duracao--;
+                printf("[DEBUG] - Mensagem '%s' no tópico '%s' com duração %d.\n", mensagens.mensagens[i].mensagem, mensagens.mensagens[i].topico, mensagens.mensagens[i].duracao);
+                if (mensagens.mensagens[i].duracao == 0)
+                {
+                    printf("[THREAD] - Mensagem '%s' no tópico '%s' expirada e removida.\n", mensagens.mensagens[i].mensagem, mensagens.mensagens[i].topico);
+                    for (int j = i; j < mensagens.num_mensagens - 1; j++)
+                    {
+                        mensagens.mensagens[j] = mensagens.mensagens[j + 1];
+                    }
+                    mensagens.num_mensagens--;
+                    i--; // Ajustar índice após remoção
+                }
+            }
+        }
+        pthread_mutex_unlock(&mensagens_mutex);
+    }
+
+    return NULL;
+}
+
 // Função principal
 int main(int argc, char *argv[])
 {
     int continua = 1;
     fd_set fdset, fdset_backup;
     struct sigaction sa;
+    pthread_t thread;
+    ThreadControl control;
 
     pthread_mutex_init(&clientes_mutex, NULL);
     pthread_mutex_init(&mensagens_mutex, NULL);
@@ -1063,6 +1222,18 @@ int main(int argc, char *argv[])
     users.clientes_registrados = NULL;
     users.num_utilizadores = 0;
     topicos.num_topicos = 0;
+
+    control.running = 1;
+
+    // Ler ficheiro de mensagens
+    readFile();
+
+    // cria thread de tempo
+    if (pthread_create(&thread, NULL, thread_contador, &control) != 0)
+    {
+        perror("[ERRO] - Falha ao criar a thread de tempo");
+        return EXIT_FAILURE;
+    }
 
     // Configurar o tratamento de sinais
     sa.sa_flags = SA_SIGINFO;
@@ -1078,7 +1249,7 @@ int main(int argc, char *argv[])
 
     printf("\n[MANAGER] - Sistema iniciado. Aguardando comandos...\n");
 
-    while (1)
+    while (CONTROLADOR)
     {
         fdset_backup = fdset;
 
@@ -1113,6 +1284,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    sair();
+    writeFile();
+    control.running = 0;
+    pthread_join(thread, NULL);
+    printf("\n[MANAGER] - Sistema encerrado.\n");
     return 0;
 }

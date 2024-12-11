@@ -200,6 +200,9 @@ int main(int argc, char *argv[])
             memset(&pedido, 0, sizeof(pedido));
             memset(&mensagem, 0, sizeof(mensagem_t));
             pedido.PidRemetente = getpid();
+            // Guardar o nome do utilizador
+            strncpy(pedido.mensagem.username, argv[1], TAM_NOME - 1);
+            pedido.mensagem.username[TAM_NOME - 1] = '\0'; // Garantir terminação nula
 
             if (strcmp(comando, EXIT) == 0)
             {

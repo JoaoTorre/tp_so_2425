@@ -12,9 +12,9 @@
 #define MAX_USERS 10            // Máximo de utilizadores
 #define MAX_TOPICS 20           // Máximo de tópicos
 #define MAX_TOPICS_MSG_PERSIS 5 // Máximo de mensagens persistentes por tópico
-#define TAM_NOME 100            // Máximo de caracteres no nome do utilizador
+#define TAM_NOME 20             // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
-#define TOPIC_LENGTH 100        // Máximo de caracteres no nome do tópico
+#define TOPIC_LENGTH 20         // Máximo de caracteres no nome do tópico
 
 // Nome do FIFO do manager
 #define MANAGER_FIFO "/tmp/manager_fifo"
@@ -61,9 +61,10 @@ typedef struct
 // Estrutura para mensagens
 typedef struct
 {
-    char topico[TAM_NOME];  // Tópico da mensagem
-    int duracao;            // Duração da mensagem
-    char mensagem[TAM_MSG]; // Corpo da mensagem
+    char topico[TOPIC_LENGTH]; // Tópico da mensagem
+    int duracao;               // Duração da mensagem
+    char mensagem[TAM_MSG];    // Corpo da mensagem
+    char username[TAM_NOME];   // Nome do utilizador
 } mensagem_t;
 
 // estrutura para guardar topicos
@@ -101,7 +102,7 @@ typedef struct client
 typedef struct
 {
     topicos_t topicos;
-    char resposta[TAM_MSG + TOPIC_LENGTH + 1];
+    char resposta[TAM_MSG + TAM_NOME + TOPIC_LENGTH + TAM_NOME];
 } resposta_t;
 
 // estrutura para guardar utilizadores no sistema
@@ -117,6 +118,12 @@ typedef struct
     mensagem_t mensagens[MAX_TOPICS_MSG_PERSIS];
     int num_mensagens;
 } mensagens_persist_t;
+
+// Estrutura que contém a flag para controlar a execução da thread
+typedef struct
+{
+    int running;
+} ThreadControl;
 
 // ---- DECLARAÇÕES DE FUNÇÕES ----
 void toUpperString(char *str);
