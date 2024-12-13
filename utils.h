@@ -10,8 +10,8 @@
 
 // Constantes para o sistema
 #define MAX_USERS 10            // Máximo de utilizadores
-#define MAX_TOPICS 1            // Máximo de tópicos
-#define MAX_TOPICS_MSG_PERSIS 1 // Máximo de mensagens persistentes por tópico
+#define MAX_TOPICS 20           // Máximo de tópicos
+#define MAX_TOPICS_MSG_PERSIS 5 // Máximo de mensagens persistentes por tópico
 #define TAM_NOME 20             // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
 #define TOPIC_LENGTH 20         // Máximo de caracteres no nome do tópico
