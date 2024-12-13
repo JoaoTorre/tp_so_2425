@@ -841,9 +841,10 @@ void processa_pedido(int manager_fifo_fd)
                 }
                 pthread_mutex_unlock(&topicos_mutex);
 
-                pthread_mutex_lock(&mensagens_mutex);
                 if (num_msg < MAX_TOPICS_MSG_PERSIS)
                 {
+                    pthread_mutex_lock(&mensagens_mutex);
+
                     strncpy(mensagens.mensagens[mensagens.num_mensagens].topico, pedido.mensagem.topico, TOPIC_LENGTH - 1);
                     mensagens.mensagens[mensagens.num_mensagens].topico[TOPIC_LENGTH - 1] = '\0';
 
@@ -852,20 +853,21 @@ void processa_pedido(int manager_fifo_fd)
                     strncpy(mensagens.mensagens[mensagens.num_mensagens].username, pedido.mensagem.username, TAM_NOME - 1);
                     mensagens.mensagens[mensagens.num_mensagens].duracao = pedido.mensagem.duracao;
                     mensagens.num_mensagens++;
-                }
-                pthread_mutex_unlock(&mensagens_mutex);
+                    pthread_mutex_unlock(&mensagens_mutex);
 
-                // Atualizar o número de mensagens no tópico correspondente
-                pthread_mutex_lock(&topicos_mutex);
-                for (int i = 0; i < topicos.num_topicos; i++)
-                {
-                    if (strcmp(topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
+                    // Atualizar o número de mensagens no tópico correspondente
+                    pthread_mutex_lock(&topicos_mutex);
+                    for (int i = 0; i < topicos.num_topicos; i++)
                     {
-                        topicos.topicos[i].num_mensagens++;
-                        break;
+                        if (strcmp(topicos.topicos[i].nome, pedido.mensagem.topico) == 0)
+                        {
+                            topicos.topicos[i].num_mensagens++;
+                            break;
+                        }
                     }
+                    pthread_mutex_unlock(&topicos_mutex);
+                    printf("[MANAGER] - Mensagem guardada como persistente\n");
                 }
-                pthread_mutex_unlock(&topicos_mutex);
             }
 
             pthread_mutex_lock(&clientes_mutex);
