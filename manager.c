@@ -318,7 +318,7 @@ void Abrir_ManagerPipe(int *manager_fifo_fd)
 {
     if (mkfifo(MANAGER_FIFO, 0666) == -1)
     {
-        perror("[ERRO] - FIFO já existe ou não foi possível criá-lo");
+        fprintf(stderr, "[ERRO] - Já se encontra um manager a correr");
         exit(EXIT_FAILURE);
     }
 
@@ -542,8 +542,6 @@ void processa_pedido(int manager_fifo_fd)
                 return;
             }
 
-            // Enviar resposta de subscrição
-            printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
             if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
             {
                 perror("[ERRO] - Falha ao enviar resposta para o cliente");
@@ -562,10 +560,8 @@ void processa_pedido(int manager_fifo_fd)
                     mensagem_t msg = mensagens.mensagens[i];
 
                     // Enviar mensagem persistente
-                    snprintf(resposta.resposta, sizeof(resposta.resposta), "%s: %s",
-                             mensagens.mensagens[i].topico, mensagens.mensagens[i].mensagem);
+                    snprintf(resposta.resposta, sizeof(resposta.resposta), "%s para %s: %s", mensagens.mensagens[i].username, mensagens.mensagens[i].topico, mensagens.mensagens[i].mensagem);
 
-                    printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
                     if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
                     {
                         perror("[ERRO] - Falha ao enviar mensagem persistente para o cliente");
@@ -643,7 +639,6 @@ void processa_pedido(int manager_fifo_fd)
                 perror("[ERRO] - Falha ao enviar resposta para o cliente");
             }
         }
-        print_topicos();
     }
     else if (strcmp(pedido.comando, UNSUBSCRIBE) == 0)
     {
@@ -831,7 +826,7 @@ void processa_pedido(int manager_fifo_fd)
                 return;
             }
 
-                        if (pedido.mensagem.duracao > 0)
+            if (pedido.mensagem.duracao > 0)
             {
 
                 int num_msg = 0;
@@ -959,8 +954,6 @@ void processa_pedido(int manager_fifo_fd)
     {
         printf("\n[ERRO] - Comando inválido: %s\n", pedido.comando);
     }
-
-    print_users();
 }
 
 // Função para verificar comandos

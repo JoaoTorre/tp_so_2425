@@ -108,8 +108,8 @@ int main(int argc, char *argv[])
     // Guardar o nome do utilizador
     strncpy(pedidoRegisto.nome_user, argv[1], TAM_NOME - 1);
     pedidoRegisto.nome_user[TAM_NOME - 1] = '\0'; // Garantir terminação nula
-    strncpy(pedidoRegisto.comando, PEDIDO_PARA_JOGAR, TAM_NOME - 1);
-    pedidoRegisto.comando[TAM_NOME - 1] = '\0';
+    strncpy(pedidoRegisto.comando, PEDIDO_PARA_JOGAR, TAM_COMANDO - 1);
+    pedidoRegisto.comando[TAM_COMANDO - 1] = '\0';
     toUpperString(pedidoRegisto.nome_user);
     printf("Sessão iniciada\nNome de utilizador: %s\n", pedidoRegisto.nome_user);
 

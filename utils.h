@@ -15,7 +15,7 @@
 #define TAM_NOME 20             // Máximo de caracteres no nome do utilizador
 #define TAM_MSG 300             // Máximo de caracteres de corpo de mensagem
 #define TOPIC_LENGTH 20         // Máximo de caracteres no nome do tópico
-
+#define TAM_COMANDO 100         // Maximo de caracteres do comando
 // Nome do FIFO do manager
 #define MANAGER_FIFO "/tmp/manager_fifo"
 
@@ -77,10 +77,10 @@ typedef struct
 // Estrutura para pedidos (mensagem enviada por um utilizador)
 typedef struct
 {
-    pid_t PidRemetente;       // PID do remetente
-    char nome_user[TAM_NOME]; // Nome do jogador
-    char comando[TAM_NOME];   // Comando enviado
-    mensagem_t mensagem;      // Mensagem enviada
+    pid_t PidRemetente;        // PID do remetente
+    char nome_user[TAM_NOME];  // Nome do jogador
+    char comando[TAM_COMANDO]; // Comando enviado
+    mensagem_t mensagem;       // Mensagem enviada
 } pedido_t;
 
 // Estrutura para representar um utilizador
@@ -102,7 +102,7 @@ typedef struct client
 typedef struct
 {
     topicos_t topicos;
-    char resposta[TAM_MSG + TAM_NOME + TOPIC_LENGTH + TAM_NOME];
+    char resposta[TAM_MSG + TAM_COMANDO];
 } resposta_t;
 
 // estrutura para guardar utilizadores no sistema
