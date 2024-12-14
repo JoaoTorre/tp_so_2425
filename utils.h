@@ -28,7 +28,7 @@
 #define FEED_EXPULSO "Foi expulso pelo manager\n"
 #define FEED_ESPERA "Maximo de utilizadores atingido. Por favor aguarde\n"
 #define PEDIDO_PARA_JOGAR "Jogador pede para jogar\n"
-
+#define MENSAGEM_ENVIADA "Mensagem enviada com sucesso\n"
 #define TOPICO_BLOQUEADO "O topico encontra-se bloqueado\n"
 #define TOPICO_MAXIMO "Maximo de topicos atingido\n"
 #define TOPICO_MAX_MSG_PERSISTENTES "Maximo de mensagens persistentes referentes a este topico atingido\n"
@@ -109,6 +109,7 @@ typedef struct
 typedef struct
 {
     CLIENT *clientes_registrados;
+    CLIENT *clientes_espera;
     int num_utilizadores;
 } users_t;
 

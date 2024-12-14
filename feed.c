@@ -111,7 +111,6 @@ int main(int argc, char *argv[])
     strncpy(pedidoRegisto.comando, PEDIDO_PARA_JOGAR, TAM_COMANDO - 1);
     pedidoRegisto.comando[TAM_COMANDO - 1] = '\0';
     toUpperString(pedidoRegisto.nome_user);
-    printf("Sessão iniciada\nNome de utilizador: %s\n", pedidoRegisto.nome_user);
 
     /* Enviar dados ao servidor */
     pedidoRegisto.PidRemetente = getpid();
@@ -134,10 +133,29 @@ int main(int argc, char *argv[])
     {
         printf("\n[RESPOSTA]: %s\n", resposta.resposta);
     }
-    else if (strstr(resposta.resposta, FEED_RECUSADO) != NULL || strstr(resposta.resposta, FEED_ESPERA) != NULL)
+    else if (strstr(resposta.resposta, FEED_RECUSADO) != NULL)
     {
         printf("\n[RESPOSTA]: %s\n", resposta.resposta);
         sair(0);
+    }
+    else if (strstr(resposta.resposta, FEED_ESPERA) != NULL) // fica em lista de espera até ser aceite
+    {
+        printf("\n[RESPOSTA]: %s\n", resposta.resposta);
+        while (1)
+        {
+
+            nBytes_lidos = read(FeedPipe_fd, &resposta, sizeof(resposta));
+            if (nBytes_lidos == -1)
+            {
+                perror("[ERRO] ao ler do pipe Feed");
+                sair(0);
+            }
+            if (strstr(resposta.resposta, FEED_ACEITE) != NULL)
+            {
+                printf("\n[RESPOSTA]: %s\n", resposta.resposta);
+                break;
+            }
+        }
     }
 
     while (1)

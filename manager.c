@@ -6,7 +6,6 @@ pthread_mutex_t mensagens_mutex; // Mutex para proteger a lista de mensagens
 pthread_mutex_t topicos_mutex;   // Mutex para proteger a lista de topicos
 pthread_mutex_t clientes_mutex;  // Mutex para proteger a lista de clientes registados
 users_t users;
-users_t listaEspera; // Lista de espera para os utilizadores
 topicos_t topicos;
 mensagens_persist_t mensagens;
 
@@ -48,6 +47,25 @@ void avisarTodos()
     }
     pthread_mutex_unlock(&clientes_mutex);
 
+    pthread_mutex_lock(&clientes_mutex);
+    CLIENT *current = users.clientes_espera;
+    while (current)
+    {
+        int feed_fifo_fd = abre_ClientPipe(current->PidRemetente);
+        if (feed_fifo_fd != -1)
+        {
+            resposta_t resposta;
+            strcpy(resposta.resposta, EXIT);
+
+            if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+            {
+                perror("[ERRO] - Falha ao enviar mensagem EXIT para o feed");
+            }
+            close(feed_fifo_fd);
+        }
+        current = current->nextClient;
+    }
+    pthread_mutex_unlock(&clientes_mutex);
     printf("[MANAGER] - Mensagem 'EXIT' enviada a todos os utilizadores registrados.\n");
 }
 
@@ -121,6 +139,17 @@ int verifica_nome(char nome_user[])
             return 1; // nome já registrado
         }
         atual = atual->nextClient;
+    }
+
+    CLIENT *current = users.clientes_espera;
+    while (current)
+    {
+        if (strcmp(current->user.nome, nome_user) == 0)
+        {
+            pthread_mutex_unlock(&clientes_mutex);
+            return 1; // nome já registrado
+        }
+        current = current->nextClient;
     }
     pthread_mutex_unlock(&clientes_mutex);
     return 0; // nome não registrado
@@ -272,6 +301,25 @@ void print_users()
     pthread_mutex_unlock(&clientes_mutex);
 }
 
+void print_espera()
+{
+    pthread_mutex_lock(&clientes_mutex);
+    CLIENT *atual = users.clientes_espera;
+    printf("Lista de utilizadores registados:\n");
+    while (atual)
+    {
+        printf("Nome: %s, PID: %d\n", atual->user.nome, atual->PidRemetente);
+        printf("TOPICOS SUBSCRITOS:\n");
+        int i = atual->user.num_topicos;
+        while (i > 0)
+        {
+            printf("Topico: %s\n", atual->user.topicos.topicos[i - 1].nome);
+            i--;
+        }
+        atual = atual->nextClient;
+    }
+    pthread_mutex_unlock(&clientes_mutex);
+}
 // Função para Remover Utilizador
 void Remover_Utilizador(char nome_utilizador[])
 {
@@ -403,8 +451,34 @@ void processa_pedido(int manager_fifo_fd)
         }
         else if (users.num_utilizadores >= MAX_USERS)
         {
-            printf("[MANAGER] Maximo de utilizadores atingido. Ignorando pedido.\n");
+            printf("[MANAGER] Maximo de utilizadores atingido. Adicionar pedido a lista de espera.\n");
+
+            // adicionar o cliente à lista de espera
+            newClient = malloc(sizeof(CLIENT));
+            if (!newClient)
+            {
+                fprintf(stderr, "[ERRO] - Falha ao alocar memória para o novo cliente.\n");
+                return;
+            }
+
+            // Preencher dados do cliente
+            pthread_mutex_lock(&clientes_mutex);
+            newClient->PidRemetente = pedido.PidRemetente;
+            strcpy(newClient->user.nome, pedido.nome_user);
+            newClient->user.num_topicos = 0;
+            newClient->nextClient = NULL;
+            pthread_mutex_unlock(&clientes_mutex);
+
+            // Adicionar cliente à lista de registrados
+            pthread_mutex_lock(&clientes_mutex);
+            newClient->nextClient = users.clientes_registrados;
+            users.clientes_registrados = newClient;
+            pthread_mutex_unlock(&clientes_mutex);
+
             strcpy(resposta.resposta, FEED_ESPERA);
+
+            // adicionar a lista de espera
+            pthread_mutex_lock(&clientes_mutex);
 
             // Abrir FIFO do cliente
             feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
@@ -898,6 +972,24 @@ void processa_pedido(int manager_fifo_fd)
                 atual = atual->nextClient;
             }
             pthread_mutex_unlock(&clientes_mutex);
+
+            strcpy(resposta.resposta, MENSAGEM_ENVIADA);
+
+            // Abrir FIFO do cliente
+            feed_fifo_fd = abre_ClientPipe(pedido.PidRemetente);
+            if (feed_fifo_fd == -1)
+            {
+                free(newClient);
+                return;
+            }
+
+            // Enviar resposta para o cliente
+            printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+            if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+            {
+                perror("[ERRO] - Falha ao enviar resposta para o cliente");
+            }
         }
         else
         {
@@ -942,7 +1034,7 @@ void processa_pedido(int manager_fifo_fd)
                 }
 
                 free(atual);
-                users.num_utilizadores--;
+                --users.num_utilizadores;
                 pthread_mutex_unlock(&clientes_mutex);
                 return;
             }
@@ -951,11 +1043,44 @@ void processa_pedido(int manager_fifo_fd)
         }
 
         pthread_mutex_unlock(&clientes_mutex);
+
+        printf("[MANAGER] - Feed removido.\n");
+
+        // adicionar o primeiro elemento da lista de espera à lista de registados
+        pthread_mutex_lock(&clientes_mutex);
+
+        CLIENT *current = users.clientes_espera;
+        users.clientes_espera = current->nextClient;
+        current->nextClient = users.clientes_registrados;
+        users.clientes_registrados = current;
+        users.num_utilizadores++;
+
+        // Abrir FIFO do cliente
+        feed_fifo_fd = abre_ClientPipe(atual->PidRemetente);
+        if (feed_fifo_fd == -1)
+        {
+            free(newClient);
+            return;
+        }
+
+        // Enviar resposta para o cliente
+        strcpy(resposta.resposta, FEED_ACEITE);
+        printf("\n[MANAGER] Enviando resposta: %s\n", resposta.resposta);
+
+        if (write(feed_fifo_fd, &resposta, sizeof(resposta)) == -1)
+        {
+            perror("[ERRO] - Falha ao enviar resposta para o cliente");
+        }
+
+        pthread_mutex_unlock(&clientes_mutex);
+
+        printf("[MANAGER] - Feed Lista de espera adicionado.\n");
     }
     else
     {
         printf("\n[ERRO] - Comando inválido: %s\n", pedido.comando);
     }
+    print_espera();
 }
 
 // Função para verificar comandos
